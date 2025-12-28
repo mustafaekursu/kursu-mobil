@@ -4,6 +4,8 @@ from PIL import Image, ImageOps, ImageFilter
 import pytesseract
 import re
 from datetime import date, timedelta
+import cv2
+import numpy as np
 
 # =============================================================================
 # 🟢 AYARLAR & GÖRÜNÜM
@@ -46,15 +48,15 @@ st.caption("Hem Yapay Zeka (Online) Hem Dahili Motor (Offline) Bir Arada")
 tabs = st.tabs(["📷 HİBRİT OKUYUCU", "⛓️ CEZA HESAPLA", "⏳ ZAMANAŞIMI", "📧 İLETİŞİM"])
 
 # =============================================================================
-# MODÜL 1: HİBRİT DOSYA OKUMA (SEÇMELİ)
+# MODÜL 1: HİBRİT DOSYA OKUMA (AKILLI OFFLINE MOTOR)
 # =============================================================================
 with tabs[0]:
     st.header("Belge Okuma Merkezi")
     
     # KULLANICIYA MOTOR SEÇTİRİYORUZ
     motor_secimi = st.radio("Kullanılacak Motor:", 
-                            ["🚀 Google Yapay Zeka (İnternet Gerekir - %99 Başarı)", 
-                             "🛠️ Dahili Motor (Daha Az İnternet - %80 Başarı)"])
+                            ["🚀 Google Yapay Zeka (Online - %100)", 
+                             "🧠 Akıllı Dahili Motor (Offline - %90)"])
 
     img_file = st.file_uploader("Belge Fotoğrafı Yükle", type=['png', 'jpg', 'jpeg'])
     
@@ -62,54 +64,87 @@ with tabs[0]:
         image = Image.open(img_file)
         st.image(image, caption="Yüklenen Belge", use_column_width=True)
         
-        # --- SEÇENEK A: GOOGLE YAPAY ZEKA ---
+        # --- SEÇENEK A: GOOGLE YAPAY ZEKA (ONLINE) ---
         if "Google" in motor_secimi:
-            if st.button("YAPAY ZEKA İLE OKU 🚀", use_container_width=True):
+            if st.button("YAPAY ZEKA İLE OKU (ONLINE) 🚀", use_container_width=True):
                 if not AI_AKTIF:
-                    st.error("⚠️ API Anahtarı (Secrets) bulunamadı. Ayarlarınızı kontrol edin.")
+                    st.error("⚠️ API Anahtarı (Secrets) tanımlı değil.")
                 else:
                     try:
                         with st.spinner("Google Gemini belgeyi inceliyor..."):
                             model = genai.GenerativeModel('gemini-1.5-flash')
-                            prompt = "Sen uzman bir katipsin. Bu hukuki belgeyi harf hatası yapmadan, düzgün bir Türkçe ile metne dök. 'GANKARA' gibi hataları 'ANKARA' olarak düzelt."
+                            prompt = "Sen uzman bir katipsin. Bu hukuki belgeyi harf hatası yapmadan, düzgün bir Türkçe ile metne dök. 'GANKARA' -> 'ANKARA', 'ESASNO' -> 'ESAS NO' düzeltmelerini yap."
                             response = model.generate_content([prompt, image])
-                            st.success("Yapay Zeka Okuması Tamamlandı!")
+                            st.success("Online Analiz Tamamlandı!")
                             st.text_area("Sonuç:", value=response.text, height=500)
                     except Exception as e:
-                        st.error(f"İnternet Hatası: {e}. Lütfen 'Dahili Motor' seçeneğine geçin.")
+                        st.error(f"İnternet Hatası: {e}. Lütfen 'Akıllı Dahili Motor'a geçin.")
 
-        # --- SEÇENEK B: DAHİLİ MOTOR (TESSERACT - ESKİ USÜL) ---
+        # --- SEÇENEK B: AKILLI DAHİLİ MOTOR (OFFLINE - OPENCV GÜÇLENDİRİLMİŞ) ---
         else:
-            st.info("💡 Dahili motor (Tesseract) seçildi. İnternet zayıfsa bu mod idealdir.")
+            st.info("💡 Bu mod internet gerektirmez. 'Bilgisayarlı Görü (OpenCV)' teknolojisi ile belgeyi iyileştirip okur.")
             
-            # Eski Görüntü İşleme Ayarları
-            with st.expander("Görüntü Ayarları (Okunmazsa Oynayın)"):
-                esik = st.slider("Siyah/Beyaz Dengesi", 50, 230, 140)
-                dondur = st.slider("Döndür", -5.0, 5.0, 0.0)
+            with st.expander("🛠️ Görüntü Laboratuvarı (Otomatik İyileştirme Aktif)"):
+                c1, c2 = st.columns(2)
+                with c1: golge_modu = st.checkbox("Gölge Temizleyici (Adaptive)", value=True, help="Kağıdın bazı yerleri karanlıksa bunu açın.")
+                with c2: kalinlastir = st.checkbox("Mürekkep Artır (Dilation)", value=False, help="Yazılar silikse veya kesikse harfleri birleştirir.")
             
-            if st.button("DAHİLİ MOTOR İLE OKU 🛠️", use_container_width=True):
+            if st.button("AKILLI MOTOR İLE OKU (OFFLINE) 🧠", use_container_width=True):
                 try:
-                    with st.spinner("Dahili motor çalışıyor..."):
-                        # 1. Döndür
-                        img = image.rotate(-dondur, expand=True, fillcolor='white')
-                        # 2. Griye Çevir & Eşikleme
-                        img = img.convert('L').point(lambda x: 0 if x < esik else 255, '1')
-                        # 3. Kenar Boşluğu
-                        img = ImageOps.expand(img, border=50, fill='white')
-                        
-                        # Okuma
-                        custom_config = r'--oem 3 --psm 6'
-                        text = pytesseract.image_to_string(img, lang='tur', config=custom_config)
-                        
-                        # Temizlik
-                        text = text.replace("|", "").replace("~", "")
-                        text = text.replace("-\n", "").replace("\n", " ")
-                        
-                        st.success("Dahili Okuma Tamamlandı!")
-                        st.text_area("Sonuç:", value=text, height=500)
-                except Exception as e:
-                    st.error(f"Motor Hatası: {e}. (GitHub'da packages.txt içinde tesseract-ocr var mı?)")
+                    with st.spinner("Görüntü işleniyor ve okunuyor..."):
+                        # 1. PIL Image -> OpenCV Formatına Çevir (Matematiksel İşlem İçin)
+                        open_cv_image = np.array(image) 
+                        # RGB'den BGR'ye (OpenCV standardı) ve Griye çevir
+                        if len(open_cv_image.shape) == 3:
+                            gray = cv2.cvtColor(open_cv_image, cv2.COLOR_RGB2GRAY)
+                        else:
+                            gray = open_cv_image
 
+                        # 2. GÖRSEL ZEKA ADIMLARI
+                        processed_img = gray
+                        
+                        # A) Gürültü Temizleme (Noise Reduction)
+                        # Kağıttaki kumlanmayı temizler
+                        processed_img = cv2.medianBlur(processed_img, 3)
+
+                        # B) Akıllı Eşikleme (Adaptive Threshold) - GÖLGE KATİLİ
+                        if golge_modu:
+                            # Bu algoritma, resmin her küçük karesi için ayrı ışık ayarı yapar.
+                            # Gölgede kalan yazıyı da, ışıkta kalanı da aynı netlikte siyah yapar.
+                            processed_img = cv2.adaptiveThreshold(
+                                processed_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                cv2.THRESH_BINARY, 31, 15 # 31 blok boyutu, 15 sabit (Hassas ayar)
+                            )
+                        else:
+                            # Standart yöntem (Otsu)
+                            _, processed_img = cv2.threshold(processed_img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+                        # C) Morfolojik İşlemler (Mürekkep Tamiri)
+                        if kalinlastir:
+                            # Harfleri biraz şişirerek kopuklukları birleştirir
+                            kernel = np.ones((2,2), np.uint8)
+                            processed_img = cv2.dilate(processed_img, kernel, iterations=1)
+
+                        # 3. İşlenmiş Resmi Tekrar Pillow'a Çevir (Tesseract İçin)
+                        final_pil_img = Image.fromarray(processed_img)
+
+                        # Kullanıcıya neyi okuduğumuzu gösterelim (Güvenilirlik için)
+                        st.image(final_pil_img, caption="Sistemin Gördüğü İyileştirilmiş Belge", use_column_width=True)
+
+                        # 4. OKUMA (Tesseract)
+                        custom_config = r'--oem 3 --psm 6'
+                        text = pytesseract.image_to_string(final_pil_img, lang='tur', config=custom_config)
+                        
+                        # 5. TEMİZLİK (Regex)
+                        text = text.replace("|", "").replace("~", "")
+                        text = re.sub(r'(?<=\d)[oO](?=\d)', '0', text) # Rakam arasındaki o'ları 0 yap
+                        
+                        st.success("Offline Okuma Tamamlandı!")
+                        st.text_area("Sonuç:", value=text, height=500)
+                        
+                except Exception as e:
+                    st.error(f"Sistem Hatası: {e}")
+                    st.warning("İPUCU: GitHub'da requirements.txt dosyasına 'opencv-python-headless' ve 'numpy' eklediniz mi?")
 # =============================================================================
 # MODÜL 2: CEZA İLAMI
 # =============================================================================
