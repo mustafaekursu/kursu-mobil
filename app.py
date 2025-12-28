@@ -170,85 +170,263 @@ with tabs[0]:
         st.markdown(f"""<div class="tutanak-kagidi"><center><b>T.C.<br>ANKARA ADLİYESİ</b><br><u>{belge}</u></center><br>{st.session_state['out_v3']}</div>""", unsafe_allow_html=True)
 
 # =============================================================================
-# MODÜL 2: CEZA İLAMI HESAPLAMA
+# MODÜL 2: CEZA İLAMI (HAPİS + ADLİ PARA ORTAK HESAP)
 # =============================================================================
 with tabs[1]:
     st.header("Ceza Hesaplama Robotu")
-    c1,c2,c3 = st.columns(3)
-    with c1: ty=st.number_input("Yıl",0,99,2)
-    with c2: ta=st.number_input("Ay",0,11,0)
-    with c3: tg=st.number_input("Gün",0,29,0)
+    st.info("💡 Hapis ve Adli Para cezasını birlikte hesaplar. Artırım/İndirim her ikisine de uygulanır.")
+
+    # 1. GİRİŞLER: HAPİS VE ADLİ PARA GÜN YAN YANA
+    st.subheader("1. Temel Cezalar")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: ty = st.number_input("Hapis (Yıl)", 0, 99, 2)
+    with c2: ta = st.number_input("Hapis (Ay)", 0, 11, 0)
+    with c3: tg = st.number_input("Hapis (Gün)", 0, 29, 0)
+    with c4: base_para = st.number_input("Adli Para (Gün)", 0, 99999, 5, help="Kanundaki temel adli para gün sayısı")
+
     st.divider()
     
+    # 2. ORTAK ARTIRIM / İNDİRİM
     col_a, col_i = st.columns(2)
     with col_a:
         st.subheader("⬆️ Artırım")
         amod = st.radio("Yöntem", ["Liste", "Manuel"], key="art_m", horizontal=True)
-        ap, apd = 0,1
-        if amod=="Liste":
-            s=st.selectbox("Oran Seç",["Yok","1/6","1/4","1/3","1/2","1 Kat"],key="art_s")
-            if s!="Yok": ap,apd=(1,1) if "Kat" in s else map(int,s.split('/'))
-        else: ap=st.number_input("Pay",1,10,1,key="art_p"); apd=st.number_input("Payda",1,20,6,key="art_pd")
-        
+        ap, apd = 0, 1
+        if amod == "Liste":
+            s = st.selectbox("Oran", ["Yok", "1/6", "1/4", "1/3", "1/2", "1 Kat", "2 Kat"], key="art_s")
+            if s != "Yok": 
+                if "Kat" in s: ap, apd = int(s.split()[0]), 1
+                else: ap, apd = map(int, s.split('/'))
+        else: 
+            ap = st.number_input("Pay", 0, 10, 0, key="art_p") # 0 varsayılan, artırım yoksa etki etmesin
+            apd = st.number_input("Payda", 1, 20, 1, key="art_pd")
+
     with col_i:
         st.subheader("⬇️ İndirim")
         imod = st.radio("Yöntem", ["Liste", "Manuel"], key="ind_m", horizontal=True)
-        ip, ipd = 0,1
-        if imod=="Liste":
-            si=st.selectbox("Oran Seç",["Yok","1/6 (TCK 62)","1/3","1/2","2/3"],key="ind_s")
-            if si!="Yok": ip,ipd=map(int,si.split(' ')[0].split('/'))
-        else: ip=st.number_input("Pay",1,10,1,key="ind_p"); ipd=st.number_input("Payda",1,20,6,key="ind_pd")
+        ip, ipd = 0, 1
+        if imod == "Liste":
+            si = st.selectbox("Oran", ["Yok", "1/6 (TCK 62)", "1/3", "1/2", "2/3", "3/4"], key="ind_s")
+            if si != "Yok": ip, ipd = map(int, si.split(' ')[0].split('/'))
+        else: 
+            ip = st.number_input("Pay", 0, 10, 0, key="ind_p")
+            ipd = st.number_input("Payda", 1, 20, 1, key="ind_pd")
 
-    # MANTIK
-    top = (ty*360)+(ta*30)+tg
-    if ap>0: top+=(top*ap)/apd
-    if ip>0: top-=(top*ip)/ipd
-    sy,rg=divmod(top,360); sa,sg=divmod(rg,30)
-    
-    st.markdown(f"""<div class="sonuc-panel"><h3>SONUÇ: {int(sy)} Yıl, {int(sa)} Ay, {int(sg)} Gün</h3></div>""", unsafe_allow_html=True)
-    if st.checkbox("Adli Para Cezasına Çevir (TCK 50)"):
-        val = st.number_input("Bir Günlük Miktar (TL)", 20, 500, 100)
-        st.info(f"💸 HESAPLANAN PARA CEZASI: {int(top*val):,} TL")
+    # --- HESAPLAMA MOTORU (ÇİFT YÖNLÜ) ---
+    # A) Gün Tabanına Çevir
+    total_hapis_gun = (ty * 360) + (ta * 30) + tg
+    total_para_gun = base_para
+
+    # B) Artırım Uygula (Her ikisine de)
+    if ap > 0:
+        total_hapis_gun += (total_hapis_gun * ap) / apd
+        total_para_gun += (total_para_gun * ap) / apd
+
+    # C) İndirim Uygula (Her ikisine de)
+    if ip > 0:
+        total_hapis_gun -= (total_hapis_gun * ip) / ipd
+        total_para_gun -= (total_para_gun * ip) / ipd
+
+    # D) Sonuçları Geri Dönüştür
+    # Hapis -> Yıl/Ay/Gün
+    sonuc_yil, kalan_gun = divmod(total_hapis_gun, 360)
+    sonuc_ay, sonuc_gun = divmod(kalan_gun, 30)
+    # Para -> Küsurat silinir (Tam Sayı Gün)
+    sonuc_para_gun = int(total_para_gun)
+
+    # --- SONUÇ EKRANI ---
+    st.markdown(f"""
+    <div class="sonuc-panel">
+        <h3 style="margin-bottom:10px; border-bottom:1px solid #ffffff50; padding-bottom:5px;">HÜKÜM SONUCU</h3>
+        <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+                <span style="font-size:1.1em; font-weight:bold;">👮 HAPİS CEZASI</span><br>
+                <span style="font-size:1.4em; color:#f1c40f;">{int(sonuc_yil)} Yıl, {int(sonuc_ay)} Ay, {int(sonuc_gun)} Gün</span>
+            </div>
+            <div style="flex:1; min-width:200px; border-left:1px solid #ffffff50; padding-left:15px;">
+                <span style="font-size:1.1em; font-weight:bold;">💰 ADLİ PARA (GÜN)</span><br>
+                <span style="font-size:1.4em; color:#2ecc71;">{sonuc_para_gun} Gün</span>
+            </div>
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    # --- PARA MİKTAR HESABI ---
+    st.write("")
+    if sonuc_para_gun > 0:
+        st.markdown("#### 💸 Miktar Hesabı (TCK 52)")
+        col_tl, col_sonuc = st.columns([1, 2])
+        with col_tl:
+            gunluk_miktar = st.number_input("Günlüğü (TL)", min_value=20, max_value=500, value=100, step=10, help="En az 20, En çok 100 TL (Yasal Sınırlar)")
+        
+        with col_sonuc:
+            toplam_odenecek = sonuc_para_gun * gunluk_miktar
+            st.success(f"ÖDENECEK ADLİ PARA CEZASI: **{toplam_odenecek:,} TL**")
+            st.caption(f"({sonuc_para_gun} Gün x {gunluk_miktar} TL)")
+            
+    elif total_hapis_gun > 0:
+        # Sadece hapis varsa, hapis->para çevirme opsiyonunu göster
+        if st.checkbox("Hapis Cezasının Paraya Çevrilmesi (TCK 50)"):
+            gunluk_m = st.number_input("Günlük Miktar (TL)", 20, 100, 20)
+            st.info(f"Hapis Karşılığı Para Cezası: **{int(total_hapis_gun * gunluk_m):,} TL**")
 
 # =============================================================================
-# MODÜL 3: ZAMANAŞIMI HESABI
+# MODÜL 3: ZAMANAŞIMI & HAK DÜŞÜRÜCÜ SÜRE (Gelişmiş Hukuk Modülü)
 # =============================================================================
 with tabs[2]:
-    st.header("Zamanaşımı Hesaplama")
-    tur = st.selectbox("Dava Türü", ["Ceza Davası (TCK 66/67)", "Hukuk Davası (TBK/HMK)"])
+    st.header("Süre Hesapları")
+    
+    # Ana Tür Seçimi
+    tur = st.selectbox("Hesaplama Türü Seçiniz:", 
+                       ["Ceza Davası Zamanaşımı (TCK)", 
+                        "Hukuk: Zamanaşımı (Borçlar/Tazminat)", 
+                        "Hukuk: Hak Düşürücü Süre (Usul/İş/Aile)"])
+    
+    # -------------------------------------------------------------------------
+    # A) CEZA DAVASI ZAMANAŞIMI
+    # -------------------------------------------------------------------------
     if "Ceza" in tur:
+        st.caption("TCK Madde 66 ve 67 uyarınca dava zamanaşımı hesabı.")
         suc_t = st.date_input("Suç İşleme Tarihi", date(2015,1,1))
-        ust = st.selectbox("Suçun Üst Sınırı", ["Ağırlaştırılmış Müebbet", "Müebbet", ">20 Yıl", "5-20 Yıl", "<5 Yıl"])
+        ust = st.selectbox("Suçun Yasadaki Üst Sınırı", 
+                           ["Ağırlaştırılmış Müebbet (30 Yıl)", "Müebbet (25 Yıl)", "20 Yıldan Fazla (20 Yıl)", "5-20 Yıl Arası (15 Yıl)", "5 Yıldan Az (8 Yıl)"])
+        
+        # Temel Süre Belirleme
         asli = 8
         if "Ağır" in ust: asli=30
         elif "Müebbet" in ust: asli=25
-        elif ">20" in ust: asli=20
+        elif "20 Yıldan" in ust: asli=20
         elif "5-20" in ust: asli=15
         
-        cc1,cc2 = st.columns(2)
-        with cc1: kes = st.radio("Kesilme Var mı?", ["Hayır", "Evet (Dava/Sorgu/Karar)"])
-        with cc2: dur = st.number_input("Durma Süresi (Gün)", 0)
+        cc1, cc2 = st.columns(2)
+        with cc1: kes = st.radio("Zamanaşımını Kesen İşlem Var mı?", ["Hayır (Asli)", "Evet (Uzamış)"], help="Şüpheli/Sanık ifadesi, tutuklama, iddianame, mahkumiyet kararı vb.")
+        with cc2: dur = st.number_input("Durma Süresi (Gün)", 0, help="Bekletici mesele, izin alma vb. süreçler.")
         
-        son = asli*1.5 if "Evet" in kes else asli
-        bitis = suc_t.replace(year=suc_t.year+int(son))
-        if son%1!=0: bitis+=timedelta(days=180)
-        bitis+=timedelta(days=dur)
-        kln = (bitis-date.today()).days
+        # Hesaplama
+        son = asli * 1.5 if "Evet" in kes else asli
+        bitis = suc_t.replace(year=suc_t.year + int(son))
+        if son % 1 != 0: bitis += timedelta(days=180) # Buçuklu yıl hesabı
+        bitis += timedelta(days=dur)
         
-        st.markdown(f"""<div class="sonuc-panel"><b>HESAPLAMA SONUCU:</b> {son} Yıl<br>Bitiş Tarihi: {bitis.strftime('%d.%m.%Y')}<br>{'✅ HENÜZ DOLMADI' if kln>0 else '❌ ZAMANAŞIMI DOLDU'}</div>""", unsafe_allow_html=True)
-    else:
-        bas = st.date_input("Başlangıç Tarihi", date.today())
-        konu = st.selectbox("Konu", ["Genel Zamanaşımı (10 Yıl)", "Kira / Vekalet (5 Yıl)", "Haksız Fiil (2 Yıl)", "Kambiyo (10 Gün/6 Ay)"])
-        y,g = 0,0
+        kln = (bitis - date.today()).days
+        
+        st.markdown(f"""
+        <div class="sonuc-panel">
+            <h4 style="margin:0; color:#f1c40f;">CEZA ZAMANAŞIMI SONUCU</h4>
+            <b>Temel Süre:</b> {son} Yıl (+{dur} gün durma)<br>
+            <b>Bitiş Tarihi:</b> {bitis.strftime('%d.%m.%Y')}<br>
+            Durum: {'✅ DAVA DEVAM EDEBİLİR' if kln>0 else '❌ ZAMANAŞIMI DOLDU (DÜŞME)'}
+        </div>""", unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # B) HUKUK: ZAMANAŞIMI (DEF'İ)
+    # -------------------------------------------------------------------------
+    elif "Hukuk: Zamanaşımı" in tur:
+        st.info("ℹ️ Zamanaşımı bir def'idir, durma ve kesilmeye tabidir. Arabuluculuk vb. süreleri 'Durma' kısmına ekleyiniz.")
+        
+        bas = st.date_input("Başlangıç Tarihi (Muacceliyet/Olay)", date.today())
+        
+        h_col1, h_col2 = st.columns(2)
+        with h_col1:
+            konu = st.selectbox("Konu / İlgili Kanun", 
+                                ["Genel Zamanaşımı (TBK 146) - 10 Yıl", 
+                                 "Kira / Vekalet / Eser (TBK 147) - 5 Yıl", 
+                                 "Haksız Fiil (TBK 72) - 2 Yıl",
+                                 "Haksız Fiil (Mutlak) - 10 Yıl",
+                                 "Kambiyo Senedi (TTK) - 3 Yıl",
+                                 "Sebepsiz Zenginleşme - 2 Yıl",
+                                 "Manuel Giriş"])
+        
+        y, g = 0, 0
+        # Presets
         if "10 Yıl" in konu: y=10
         elif "5 Yıl" in konu: y=5
+        elif "3 Yıl" in konu: y=3
         elif "2 Yıl" in konu: y=2
-        elif "10 Gün" in konu: g=10
-        bit = bas.replace(year=bas.year+y)+timedelta(days=g)
-        k = (bit-date.today()).days
-        st.markdown(f"<div class='sonuc-panel'>Bitiş Tarihi: {bit.strftime('%d.%m.%Y')}<br>{'✅ SÜRE VAR' if k>0 else '❌ SÜRE DOLDU'}</div>", unsafe_allow_html=True)
+        
+        with h_col2:
+            if "Manuel" in konu:
+                y = st.number_input("Yıl Giriniz", 0, 50, 1)
+                g = st.number_input("Gün Giriniz", 0, 365, 0)
+            
+            durma_gun = st.number_input("Durma Süresi (Gün)", 0, help="Örn: Arabuluculukta geçen süre")
 
-# =============================================================================
+        # Hesaplama
+        bitis = bas.replace(year=bas.year + y) + timedelta(days=g + durma_gun)
+        kalan = (bitis - date.today()).days
+        
+        st.markdown(f"""
+        <div class="sonuc-panel">
+            <h4 style="margin:0; color:#3498db;">ZAMANAŞIMI HESABI</h4>
+            <b>Bitiş Tarihi:</b> {bitis.strftime('%d.%m.%Y')}<br>
+            <b>Eklenen Durma Süresi:</b> {durma_gun} Gün<br>
+            Durum: {'✅ HENÜZ DOLMADI' if kalan>0 else '⚠️ ZAMANAŞIMI DEFİ İLERİ SÜRÜLEBİLİR'}
+        </div>""", unsafe_allow_html=True)
+
+    # -------------------------------------------------------------------------
+    # C) HUKUK: HAK DÜŞÜRÜCÜ SÜRE (İTİRAZ)
+    # -------------------------------------------------------------------------
+    elif "Hak Düşürücü" in tur:
+        st.warning("⚠️ Hak düşürücü süreler kesilmez ve durmaz. Hakim tarafından resen (kendiliğinden) dikkate alınır.")
+        
+        bas_h = st.date_input("Tebliğ / Öğrenme Tarihi", date.today())
+        
+        tip = st.selectbox("Dava Türü", 
+                           ["İşe İade (1 Ay) - İş K.", 
+                            "Önalım (Şufa) - 3 Ay (TMK)", 
+                            "Tenkis Davası - 1 Yıl (TMK)", 
+                            "Soybağının Reddi - 1 Yıl (TMK)",
+                            "Ecrimisil - 5 Yıl (HGK Kararları)",
+                            "İdari Dava Açma (60 Gün)",
+                            "Vergi Davası Açma (30 Gün)",
+                            "Manuel Giriş"])
+        
+        dy, dm, dd = 0, 0, 0
+        
+        # Mantıklar
+        if "İşe İade" in tip: dm = 1
+        elif "Önalım" in tip: dm = 3
+        elif "Tenkis" in tip: dy = 1
+        elif "Soybağının" in tip: dy = 1
+        elif "Ecrimisil" in tip: dy = 5
+        elif "60 Gün" in tip: dd = 60
+        elif "30 Gün" in tip: dd = 30
+        
+        if "Manuel" in tip:
+            c_man1, c_man2 = st.columns(2)
+            with c_man1: dy = st.number_input("Yıl", 0)
+            with c_man1: dm = st.number_input("Ay", 0)
+            with c_man2: dd = st.number_input("Gün", 0)
+            
+        # Basit Tarih Ekleme (Ay eklerken takvim kaymasını önlemek için yaklaşık hesap yerine timedelta kullanıyoruz ama ay ekleme karmaşıktır, burada işi basitleştirip gün bazlı veya yıl bazlı gidiyoruz. Hakim için en neti gün hesabıdır ama ay için yaklaşık 30 alalım)
+        
+        # Net Hesap
+        # Yıl Ekleme
+        hedef = bas_h.replace(year=bas_h.year + dy)
+        
+        # Ay Ekleme (Basit Mantık: Ay atlatma)
+        # Python'da doğrudan ay ekleme olmadığı için 30 gün mantığı yerine tarih kütüphanesi mantığı:
+        new_month = hedef.month + dm
+        extra_year = 0
+        if new_month > 12:
+            extra_year = new_month // 12
+            new_month = new_month % 12
+            if new_month == 0: # Aralık ayı durumu düzeltme
+                new_month = 12
+                extra_year -= 1
+        
+        hedef = hedef.replace(year=hedef.year + extra_year, month=new_month)
+        
+        # Gün Ekleme
+        hedef += timedelta(days=dd)
+        
+        kalan_h = (hedef - date.today()).days
+        
+        st.markdown(f"""
+        <div class="sonuc-panel" style="border-left-color: #e74c3c;">
+            <h4 style="margin:0; color:#e74c3c;">HAK DÜŞÜRÜCÜ SÜRE SONUCU</h4>
+            <b>Son İşlem Tarihi:</b> {hedef.strftime('%d.%m.%Y')}<br>
+            Durum: {'✅ HAK DÜŞMEMİŞTİR' if kalan_h>=0 else '❌ HAK DÜŞMÜŞTÜR (USULDEN RED)'}
+        </div>""", unsafe_allow_html=True)# =============================================================================
 # MODÜL 4: İLETİŞİM VE GÜVENLİK
 # =============================================================================
 with tabs[3]:
