@@ -129,88 +129,88 @@ with tabs[0]:
                 except Exception as e: st.error(f"Hata: {e}")
             else: st.error("Ses modülü sunucuda aktif değil.")
 
-    # --- 3. FOTOĞRAF GİRİŞİ (METİN CERRAHI & GÜÇLENDİRİLMİŞ OCR) ---
+    # --- 3. FOTOĞRAF GİRİŞİ (AKILLI NETLEŞTİRME & GÜRÜLTÜ GİDERİCİ) ---
     elif "Fotoğraf" in secim:
-        st.info("Kürsü Pro v3.5: Cümle birleştirme ve leke temizleme motoru devrede.")
+        st.info("Kürsü Pro v3.6: Gürültü temizleme ve akıllı netleştirme devrede.")
         img_file = st.file_uploader("Resim Yükle", type=['png', 'jpg', 'jpeg'])
         
         if img_file:
             if Image is None:
                 st.error("⚠️ HATA: Pillow kütüphanesi eksik.")
             else:
-                # Görüntüyü Aç
                 original_image = Image.open(img_file)
                 st.image(original_image, caption="Orijinal Belge", use_column_width=True)
                 
                 # --- AYARLAR PANELİ ---
-                with st.expander("🛠️ Gelişmiş Ayarlar (Sorun Varsa Burayı Açın)", expanded=True):
+                with st.expander("🛠️ Okuma Ayarları", expanded=True):
                     c1, c2 = st.columns(2)
                     with c1:
                         okuma_modu = st.selectbox("Tarama Modu:", 
-                                                  ["Tek Blok Metin (PSM 6 - En İyisi)", 
+                                                  ["Tek Blok (PSM 6 - Önerilen)", 
                                                    "Otomatik (PSM 3)", 
-                                                   "Tek Sütun (PSM 4)"])
+                                                   "Seyrek Metin (PSM 11)"])
                     with c2:
-                        # Bu özellik cümleleri birleştirir
-                        birlestir = st.checkbox("Cümleleri Birleştir (Satırları Düzelt)", value=True, help="Kağıttaki satır sonlarını kaldırıp akıcı bir metin haline getirir.")
+                        filtre_seviyesi = st.select_slider("Temizlik Seviyesi (Lekeleri Sil)", options=["Hafif", "Orta", "Güçlü"], value="Orta")
                 
-                if st.button("Belgeyi Tara ve İyileştir 🔍"):
+                if st.button("Belgeyi Tara 🔍"):
                     if pytesseract:
                         try:
-                            with st.spinner("1/3 Görüntü iyileştiriliyor..."):
-                                # A. GÖRÜNTÜ İŞLEME (PRE-PROCESSING)
+                            # İŞLEM BAŞLIYOR
+                            with st.spinner("Görüntü temizleniyor ve okunuyor..."):
                                 img = original_image
                                 
-                                # Boyutlandırma (Küçük resimleri büyüt ki harfler seçilsin)
+                                # 1. BÜYÜTME (Harfleri netleştirmek için çok kritik)
+                                # Resmi 2 katına çıkarıyoruz
                                 w, h = img.size
-                                if w < 1000: 
-                                    img = img.resize((w*2, h*2), Image.LANCZOS)
+                                img = img.resize((w*2, h*2), Image.LANCZOS)
                                 
-                                img = img.convert('L') # Griye çevir
+                                # 2. GRİ TONLAMA
+                                img = img.convert('L')
                                 
-                                # Kontrastı ve Keskinliği Artır (Daha agresif ayarlar)
-                                enhancer = ImageEnhance.Contrast(img)
-                                img = enhancer.enhance(2.5) # Kontrastı 2.5 kat artır (Yazılar simsiyah olsun)
-                                
-                                sharpener = ImageEnhance.Sharpness(img)
-                                img = sharpener.enhance(2.0) # Keskinliği 2 kat artır
-                                
-                                # Faks Modu (Binarization - Eşik Değeri)
-                                # 160 değeri gri alanları beyaza çevirir, lekeleri azaltır
-                                img = img.point(lambda x: 0 if x < 160 else 255, '1')
+                                # 3. GÜRÜLTÜ TEMİZLEME (Median Filter) - İşte sihir burada
+                                # Kağıttaki noktacıkları yok eder
+                                if filtre_seviyesi == "Hafif":
+                                    pass # Sadece gri yap
+                                elif filtre_seviyesi == "Orta":
+                                    img = img.filter(ImageFilter.MedianFilter(3)) # 3 piksellik lekeleri sil
+                                elif filtre_seviyesi == "Güçlü":
+                                    img = img.filter(ImageFilter.MedianFilter(5)) # 5 piksellik lekeleri sil (Büyük yazılar için)
 
-                            with st.spinner("2/3 Metin okunuyor..."):
-                                # B. OCR MOTORU
-                                psm = 6 if "PSM 6" in okuma_modu else (4 if "PSM 4" in okuma_modu else 3)
-                                custom_config = f'--oem 3 --psm {psm}'
+                                # 4. KONTRAST VE NETLİK (Daha yumuşak ayar)
+                                img = ImageOps.autocontrast(img) # En karanlık ve en aydınlık yeri dengele
                                 
+                                enhancer = ImageEnhance.Sharpness(img)
+                                img = enhancer.enhance(1.5) # Hafif keskinleştir
+                                
+                                # KULLANICIYA GÖSTER (Sistem ne görüyor?)
+                                st.image(img, caption="Sistemin Okuduğu Temizlenmiş Görüntü (Yazılar net mi?)", use_column_width=True)
+
+                                # 5. OCR İŞLEMİ
+                                psm = 6 # Varsayılan (Tek Blok)
+                                if "PSM 3" in okuma_modu: psm = 3
+                                elif "PSM 11" in okuma_modu: psm = 11
+                                
+                                custom_config = f'--oem 3 --psm {psm}'
                                 text = pytesseract.image_to_string(img, lang='tur', config=custom_config)
-                                # Yedek İngilizce desteği (Bazı karakterler için)
-                                if len(text) < 10:
+                                
+                                # İngilizce destekli ikinci geçiş (Eğer çok kısaysa)
+                                if len(text) < 20:
                                     text = pytesseract.image_to_string(img, lang='tur+eng', config=custom_config)
 
-                            with st.spinner("3/3 Metin Cerrahı çalışıyor..."):
-                                # C. METİN CERRAHI (POST-PROCESSING) - İŞTE SİHİR BURADA
-                                if birlestir:
-                                    # 1. Satır sonu tirelerini birleştir (gel- di -> geldi)
-                                    text = text.replace("-\n", "")
-                                    # 2. Gereksiz yeni satırları boşluğa çevir (Paragraf akışı)
-                                    text = text.replace("\n", " ")
-                                    # 3. Çift boşlukları teke düşür
-                                    text = re.sub(r'\s+', ' ', text)
-                                    # 4. OCR Çöplerini Temizle (| ~ _ gibi semboller)
-                                    text = re.sub(r'[|~_©®]', '', text)
-                                    # 5. Noktadan sonra boşluk yoksa ekle
-                                    text = text.replace(".", ". ")
-                                    
-                            st.success("İşlem Başarılı! Metin düzenlendi.")
-                            st.text_area("Sonuç Metni (Kopyalamaya Hazır):", value=text.strip(), height=350)
-                            st.info("İPUCU: Yukarıdaki metni kopyalayıp Word'e yapıştırabilir veya aşağıdaki 'Sihirli Formatla' butonunu kullanabilirsiniz.")
+                            # SONUÇ İŞLEME
+                            # Gereksiz sembolleri temizle
+                            text = text.replace("|", "").replace("~", "").replace("`", "")
+                            # Satır birleştirme
+                            text = text.replace("-\n", "")
+                            text = text.replace("\n", " ")
+                            
+                            st.success("Okuma Tamamlandı!")
+                            st.text_area("Sonuç Metni:", value=text.strip(), height=350)
                             
                         except Exception as e:
-                            st.error(f"Hata Oluştu: {e}")
+                            st.error(f"Hata: {e}")
                     else:
-                        st.error("OCR Motoru Bulunamadı. (packages.txt kontrol ediniz)")
+                        st.error("OCR Motoru Bulunamadı.")
     st.markdown("---")
     # FORMATLAMA BÖLÜMÜ
     c1, c2 = st.columns([1,2])
