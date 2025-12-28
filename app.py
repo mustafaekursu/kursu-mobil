@@ -3,7 +3,7 @@ import re
 from datetime import date, timedelta
 from io import StringIO
 
-# Harici kütüphane kontrolü (Hata vermemesi için)
+# Harici kütüphane kontrolü
 try:
     import speech_recognition as sr
 except ImportError:
@@ -12,83 +12,89 @@ except ImportError:
 # =============================================================================
 # 🟢 AYARLAR
 # =============================================================================
-HAKIM_MAIL = "mustafa.emin.tr@hotmail.com.tr" 
+HAKIM_MAIL = "mustafa.emin.tr@hotmail.com" 
 
-# --- SAYFA VE GELİŞMİŞ TASARIM ---
-st.set_page_config(page_title="KÜRSÜ PRO v3", page_icon="⚖️", layout="centered")
+# --- SAYFA AYARLARI ---
+st.set_page_config(page_title="KÜRSÜ PRO", page_icon="⚖️", layout="centered")
 
-# CSS: YÜKSEK KONTRAST VE OKUNAKLILIK
+# --- CSS: AYDINLIK (ADLİYE) TEMASI ---
 st.markdown("""
     <style>
-    /* GENEL SAYFA RENGİ */
-    .stApp { background-color: #0e1117; color: #ffffff; }
-    
-    /* GİRİŞ KUTULARI (TEXT AREA/INPUT) */
-    .stTextArea textarea, .stTextInput input, .stNumberInput input {
-        background-color: #262730 !important;
-        color: #ffffff !important;
-        border: 1px solid #4b4b4b !important;
-        font-size: 16px !important;
+    /* 1. GENEL SAYFA (BEYAZ ZEMİN, SİYAH YAZI) */
+    .stApp {
+        background-color: #ffffff !important;
+        color: #000000 !important;
     }
     
-    /* BUTONLAR */
-    div.stButton > button {
-        background-color: #e74c3c !important; /* Canlı Kırmızı */
-        color: white !important;
-        font-weight: bold !important;
-        border-radius: 8px !important;
-        border: none !important;
-        padding: 10px 20px !important;
-        transition: all 0.3s ease;
+    /* 2. TÜM YAZILAR, ETİKETLER, BAŞLIKLAR */
+    h1, h2, h3, h4, h5, h6, p, span, label, div {
+        color: #000000 !important;
     }
-    div.stButton > button:hover {
-        background-color: #c0392b !important;
-        transform: scale(1.02);
+    
+    /* 3. GİRİŞ KUTULARI (NET ÇERÇEVELİ) */
+    .stTextInput input, .stNumberInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {
+        background-color: #f8f9fa !important;
+        color: #000000 !important;
+        border: 1px solid #ced4da !important;
     }
-
-    /* SEKMELER (TABS) */
+    
+    /* 4. SEKMELER (TABS) */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
-        background-color: #1e1e1e;
+        background-color: #e9ecef;
         border-radius: 5px;
         padding: 10px 20px;
-        color: #bdc3c7;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #3498db;
-        color: white;
+        color: #495057 !important;
         font-weight: bold;
     }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background-color: #0d6efd; /* Adalet Mavisi */
+        color: white !important;
+    }
 
-    /* TUTANAK KAĞIDI GÖRÜNÜMÜ */
+    /* 5. BUTONLAR */
+    div.stButton > button {
+        background-color: #d63031 !important; /* Canlı Kırmızı */
+        color: white !important;
+        font-weight: bold !important;
+        border: none !important;
+        padding: 10px 20px !important;
+    }
+    div.stButton > button:hover {
+        background-color: #b71c1c !important;
+    }
+
+    /* 6. TUTANAK KAĞIDI GÖRÜNÜMÜ */
     .tutanak-kagidi {
-        background-color: #fdfefe; 
-        color: #000000 !important; /* Kağıt üstü yazı simsiyah olsun */
-        padding: 30px;
+        background-color: #ffffff; 
+        color: #000000 !important;
+        padding: 40px;
         font-family: 'Times New Roman', serif; 
         font-size: 16px; 
         line-height: 1.6;
-        border: 1px solid #bdc3c7; 
-        border-radius: 5px;
+        border: 2px solid #333; 
+        box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
         margin-top: 20px;
     }
-    .baslik-tc { text-align: center; font-weight: bold; margin-bottom: 10px; color:black;}
-    .baslik-alt { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 25px; color:black;}
-
-    /* SONUÇ PANELLERİ */
+    
+    /* 7. SONUÇ KUTULARI */
     .sonuc-panel { 
-        background-color: #1b2631; 
+        background-color: #2c3e50; 
+        color: #ffffff !important; /* Kutu içi yazı beyaz kalsın */
         padding: 20px; 
-        border-radius: 12px; 
-        border-left: 6px solid #f1c40f; 
+        border-radius: 10px; 
+        border-left: 8px solid #f1c40f; 
         margin-top: 15px; 
-        color: white;
+    }
+    /* Sonuç kutusu içindeki başlıkları beyaz yap */
+    .sonuc-panel h3, .sonuc-panel span, .sonuc-panel div {
+        color: #ffffff !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("⚖️ KÜRSÜ PRO: v3.0")
-st.caption("Gelişmiş Arayüz | Dosya Yükleme | Tam Kapsamlı Hesaplama")
+st.title("⚖️ KÜRSÜ PRO")
+st.caption("Aydınlık Tema | Adli Asistan | Tam Kapsamlı")
 
 tabs = st.tabs(["📁 DOSYA & KATİP", "⛓️ CEZA İLAMI", "⏳ ZAMANAŞIMI", "📧 İLETİŞİM"])
 
@@ -109,179 +115,145 @@ def metni_hukuki_formatla(ham_metin):
     return metin.strip()
 
 # =============================================================================
-# MODÜL 1: DOSYA YÜKLEME VE KATİP
+# MODÜL 1: DOSYA VE KATİP (Eksiksiz)
 # =============================================================================
 with tabs[0]:
-    st.header("Dosya İşleme ve Düzenleme")
+    st.header("Dosya İşleme")
     
-    secim = st.radio("İşlem Yöntemi Seçiniz:", ["📝 Metin Yapıştır (En Hızlı/Güvenli)", "🎙️ Ses Dosyası Yükle", "🖼️ Fotoğraf Yükle"], horizontal=True)
+    # Seçenekler
+    secim = st.radio("Yöntem Seçiniz:", ["📝 Metin Yapıştır (Önerilen)", "🎙️ Ses Dosyası Yükle", "🖼️ Fotoğraf Yükle"], horizontal=True)
     
     ham_girdi = ""
     
-    # --- A) METİN YAPIŞTIRMA (HİBRİT) ---
+    # A) Metin
     if "Metin" in secim:
-        st.info("💡 Telefonunuzun kamerasından veya sesli yazma özelliğinden metni kopyalayıp buraya yapıştırın.")
-        ham_girdi = st.text_area("Metni Yapıştır:", height=200, placeholder="Duruşma tutanağını buraya yapıştırın...")
+        st.info("Kopyaladığınız metni aşağıya yapıştırın.")
+        ham_girdi = st.text_area("Metin Alanı:", height=200)
 
-    # --- B) SES DOSYASI YÜKLEME ---
+    # B) Ses
     elif "Ses" in secim:
-        st.warning("⚠️ Bu özellik internet bağlantısı gerektirir (Google Servisleri).")
-        uploaded_audio = st.file_uploader("Ses Dosyası Seç (WAV/FLAC)", type=['wav', 'flac'])
-        
-        if uploaded_audio is not None and sr:
-            if st.button("Sesi Yazıya Dök"):
-                r = sr.Recognizer()
-                with sr.AudioFile(uploaded_audio) as source:
-                    audio_data = r.record(source)
-                    try:
-                        text = r.recognize_google(audio_data, language="tr-TR")
-                        st.success("Ses başarıyla çözüldü!")
-                        ham_girdi = st.text_area("Çözülen Metin:", value=text, height=150)
-                    except Exception as e:
-                        st.error(f"Hata: {e}")
-        elif not sr:
-            st.error("Ses kütüphanesi yüklenemedi. Lütfen 'Metin Yapıştır' modunu kullanın.")
+        st.warning("İnternet bağlantısı gerektirir.")
+        uploaded_audio = st.file_uploader("Ses Dosyası (.wav)", type=['wav', 'flac'])
+        if uploaded_audio and sr:
+            if st.button("Sesi Çöz"):
+                try:
+                    r = sr.Recognizer()
+                    with sr.AudioFile(uploaded_audio) as source:
+                        audio = r.record(source)
+                        ham_girdi = r.recognize_google(audio, language="tr-TR")
+                        st.success("Çözüldü!")
+                        st.text_area("Sonuç:", value=ham_girdi)
+                except Exception as e: st.error(f"Hata: {e}")
 
-    # --- C) FOTOĞRAF YÜKLEME ---
+    # C) Fotoğraf
     elif "Fotoğraf" in secim:
-        st.info("💡 Sunucu güvenliği ve hızı için: Fotoğrafı yükleyin, telefonunuzdan metni seçip kopyalayın.")
-        uploaded_img = st.file_uploader("Evrak Fotoğrafı Seç", type=['png', 'jpg', 'jpeg'])
+        st.info("Fotoğrafı görüntüleyip metni telefonunuzla seçerek kopyalayın.")
+        uploaded_img = st.file_uploader("Resim Seç", type=['png', 'jpg', 'jpeg'])
         if uploaded_img:
-            st.image(uploaded_img, caption="Yüklenen Evrak", use_column_width=True)
-            ham_girdi = st.text_area("Fotoğraftan Okunan Metni Buraya Yapıştırın:", height=150)
+            st.image(uploaded_img, use_column_width=True)
+            ham_girdi = st.text_area("Metni Buraya Yapıştırın:", height=150)
 
-    # --- FORMATLAMA İŞLEMİ ---
     st.markdown("---")
-    col1, col2 = st.columns([1, 2])
-    with col1: belge_tipi = st.selectbox("Belge Başlığı", ["DURUŞMA TUTANAĞI", "GEREKÇELİ KARAR", "İFADE TUTANAĞI"])
-    with col2: 
-        st.write("") # Boşluk
-        st.write("") 
-        if st.button("Sihirli Formatla (Düzenle) ✨", use_container_width=True):
-            if ham_girdi:
-                st.session_state['fmt_v3'] = metni_hukuki_formatla(ham_girdi)
-                st.success("Metin mahkeme formatına uyarlandı.")
-            else:
-                st.warning("Lütfen işlenecek bir metin giriniz.")
+    c1, c2 = st.columns([1,2])
+    with c1: belge = st.selectbox("Belge Başlığı", ["DURUŞMA TUTANAĞI", "GEREKÇELİ KARAR", "İFADE"])
+    with c2: 
+        st.write("")
+        st.write("")
+        if st.button("Sihirli Formatla ✨", use_container_width=True):
+            if ham_girdi: st.session_state['f3'] = metni_hukuki_formatla(ham_girdi)
 
-    # --- KAĞIT GÖRÜNÜMÜ ---
-    if 'fmt_v3' in st.session_state:
-        st.markdown(f"""
-        <div class="tutanak-kagidi">
-            <div class="baslik-tc">T.C.<br>ANKARA<br>... MAHKEMESİ</div>
-            <div class="baslik-alt">{belge_tipi}</div>
-            {st.session_state['fmt_v3']}
-        </div>
-        """, unsafe_allow_html=True)
+    if 'f3' in st.session_state:
+        st.markdown(f"""<div class="tutanak-kagidi"><center><b>T.C.<br>ANKARA<br>MAHKEMESİ</b><br><u>{belge}</u></center><br>{st.session_state['f3']}</div>""", unsafe_allow_html=True)
 
 # =============================================================================
-# MODÜL 2: CEZA İLAMI
+# MODÜL 2: CEZA İLAMI (Eksiksiz)
 # =============================================================================
 with tabs[1]:
     st.header("Ceza Hesaplama")
-    c1, c2, c3 = st.columns(3)
-    with c1: ty = st.number_input("Yıl",0,99,2)
-    with c2: ta = st.number_input("Ay",0,11,0)
-    with c3: tg = st.number_input("Gün",0,29,0)
-    
+    c1,c2,c3 = st.columns(3)
+    with c1: ty=st.number_input("Yıl",0,99,2)
+    with c2: ta=st.number_input("Ay",0,11,0)
+    with c3: tg=st.number_input("Gün",0,29,0)
     st.divider()
     
-    # Artırım
     ca, ci = st.columns(2)
     with ca:
         st.subheader("⬆️ Artırım")
-        a_mod = st.radio("Tip", ["Liste", "Manuel"], key="ar", horizontal=True)
+        am = st.radio("Tip", ["Liste", "Manuel"], key="ar1", horizontal=True)
         ap, apd = 0,1
-        if a_mod=="Liste":
-            s=st.selectbox("Oran",["Yok","1/6","1/4","1/3","1/2","1 Kat"],key="as")
-            if s!="Yok": ap,apd = (1,1) if "Kat" in s else map(int,s.split('/'))
-        else:
-            ap=st.number_input("Pay",1,10,1,key="amp"); apd=st.number_input("Payda",1,20,6,key="amdp")
+        if am=="Liste":
+            s=st.selectbox("Oran",["Yok","1/6","1/4","1/3","1/2","1 Kat"],key="as1")
+            if s!="Yok": ap,apd=(1,1) if "Kat" in s else map(int,s.split('/'))
+        else: ap=st.number_input("Pay",1,10,1,key="amp1"); apd=st.number_input("Payda",1,20,6,key="amd1")
 
-    # İndirim
     with ci:
         st.subheader("⬇️ İndirim")
-        i_mod = st.radio("Tip", ["Liste", "Manuel"], key="ir", horizontal=True)
+        im = st.radio("Tip", ["Liste", "Manuel"], key="ir1", horizontal=True)
         ip, ipd = 0,1
-        if i_mod=="Liste":
-            si=st.selectbox("Oran",["Yok","1/6 (TCK 62)","1/3","1/2","2/3"],key="is")
-            if si!="Yok": ip,ipd = map(int,si.split(' ')[0].split('/'))
-        else:
-            ip=st.number_input("Pay",1,10,1,key="imp"); ipd=st.number_input("Payda",1,20,6,key="imdp")
+        if im=="Liste":
+            si=st.selectbox("Oran",["Yok","1/6 (TCK 62)","1/3","1/2","2/3"],key="is1")
+            if si!="Yok": ip,ipd=map(int,si.split(' ')[0].split('/'))
+        else: ip=st.number_input("Pay",1,10,1,key="imp1"); ipd=st.number_input("Payda",1,20,6,key="imd1")
 
-    # Hesap
-    top_g = (ty*360)+(ta*30)+tg
-    if ap>0: top_g += (top_g*ap)/apd
-    if ip>0: top_g -= (top_g*ip)/ipd
-    sy,rg = divmod(top_g, 360); sa,sg = divmod(rg, 30)
+    top = (ty*360)+(ta*30)+tg
+    if ap>0: top+=(top*ap)/apd
+    if ip>0: top-=(top*ip)/ipd
+    sy,rg=divmod(top,360); sa,sg=divmod(rg,30)
     
     st.markdown(f"""
-    <div class="sonuc-panel" style="border-left-color: #e74c3c;">
-        <h3 style="margin:0;">SONUÇ: {int(sy)} Yıl, {int(sa)} Ay, {int(sg)} Gün</h3>
-    </div>
-    """, unsafe_allow_html=True)
-
-    if st.checkbox("Adli Para Cezasına Çevir (TCK 50)"):
-        gb = st.number_input("Günlüğü (TL)", 20, 500, 100)
-        st.info(f"💸 {int(top_g * gb):,} TL")
+    <div class="sonuc-panel">
+        <h3 style="color:white !important; margin:0;">SONUÇ: {int(sy)} Yıl, {int(sa)} Ay, {int(sg)} Gün</h3>
+    </div>""", unsafe_allow_html=True)
+    
+    if st.checkbox("Adli Para Cezasına Çevir"):
+        gb = st.number_input("Günlük (TL)", 20, 500, 100)
+        st.info(f"💸 {int(top*gb):,} TL")
 
 # =============================================================================
-# MODÜL 3: ZAMANAŞIMI
+# MODÜL 3: ZAMANAŞIMI (Eksiksiz)
 # =============================================================================
 with tabs[2]:
     st.header("Süre Hesapları")
-    tur = st.selectbox("Tür", ["Ceza Davası (TCK 66/67)", "Hukuk Davası (TBK/HMK)"])
-    
+    tur = st.selectbox("Tür", ["Ceza (TCK 66/67)", "Hukuk (TBK/HMK)"])
     if "Ceza" in tur:
-        suc_tarihi = st.date_input("Suç Tarihi", date(2015, 1, 1))
-        suc_tipi = st.selectbox("Suçun Üst Sınırı", ["Ağırlaştırılmış Müebbet", "Müebbet", ">20 Yıl", "5-20 Yıl", "<5 Yıl"])
-        asli = 8
-        if "Ağır" in suc_tipi: asli=30
-        elif "Müebbet" in suc_tipi: asli=25
-        elif ">20" in suc_tipi: asli=20
-        elif "5-20" in suc_tipi: asli=15
+        st = st # Streamlit alias
+        tar = st.date_input("Suç Tarihi", date(2015,1,1))
+        sinir = st.selectbox("Üst Sınır", ["Ağırlaştırılmış", "Müebbet", ">20 Yıl", "5-20 Yıl", "<5 Yıl"])
+        asli=8
+        if "Ağır" in sinir: asli=30
+        elif "Müebbet" in sinir: asli=25
+        elif ">20" in sinir: asli=20
+        elif "5-20" in sinir: asli=15
         
-        c1, c2 = st.columns(2)
-        with c1: kesme = st.radio("Zamanaşımı Kesen İşlem?", ["Hayır", "Evet (Sorgu/Karar)"])
-        with c2: durma = st.number_input("Durma Süresi (Gün)", 0)
+        c1,c2=st.columns(2)
+        with c1: kes = st.radio("Zamanaşımı Kesen İşlem?", ["Hayır", "Evet"])
+        with c2: dur = st.number_input("Durma (Gün)", 0)
         
-        sonuc_yil = asli * 1.5 if "Evet" in kesme else asli
-        bitis = suc_tarihi.replace(year=suc_tarihi.year + int(sonuc_yil))
-        if sonuc_yil % 1 != 0: bitis += timedelta(days=180)
-        bitis += timedelta(days=durma)
+        son = asli*1.5 if "Evet" in kes else asli
+        bit = tar.replace(year=tar.year+int(son))
+        if son%1!=0: bit+=timedelta(days=180)
+        bit+=timedelta(days=dur)
+        kal = (bit-date.today()).days
+        renk, msj = ("green","DOLMADI") if kal>0 else ("red","DOLDU")
         
-        kalan = (bitis - date.today()).days
-        renk = "green" if kalan > 0 else "red"
-        msj = "✅ DOLMADI" if kalan > 0 else "❌ DOLDU"
-        
-        st.markdown(f"""
-        <div class="sonuc-panel">
-            <b>HESAPLAMA:</b> {sonuc_yil} Yıl (+{durma} gün)<br>
-            Bitiş: {bitis.strftime('%d.%m.%Y')}<br>
-            Durum: <span style='color:{renk}; font-weight:bold; font-size:1.2em'>{msj}</span>
-        </div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div class="sonuc-panel"><b>HESAP:</b> {son} Yıl (+{dur} gün)<br>Bitiş: {bit.strftime('%d.%m.%Y')}<br><span style='color:{renk}; font-weight:bold; font-size:1.2em'>{msj}</span></div>""", unsafe_allow_html=True)
     else:
-        baslangic = st.date_input("Başlangıç", date.today())
-        konu = st.selectbox("Konu", ["Genel (10 Yıl)", "Kira (5 Yıl)", "Haksız Fiil (2 Yıl)", "İşe İade (1 Ay)", "Çek (10 Gün)"])
-        y, g = 0, 0
+        bas = st.date_input("Başlangıç", date.today())
+        konu = st.selectbox("Konu", ["Genel (10 Yıl)", "Kira (5 Yıl)", "Haksız Fiil (2 Yıl)", "Çek (10 Gün)"])
+        y,g=0,0
         if "10 Yıl" in konu: y=10
         elif "5 Yıl" in konu: y=5
         elif "2 Yıl" in konu: y=2
-        elif "1 Ay" in konu: g=30
         elif "10 Gün" in konu: g=10
-        
-        bitis = baslangic.replace(year=baslangic.year+y) + timedelta(days=g)
-        kalan = (bitis - date.today()).days
-        st.markdown(f"<div class='sonuc-panel'>Bitiş: {bitis.strftime('%d.%m.%Y')}<br>{'✅ SÜRE VAR' if kalan>0 else '❌ SÜRE DOLDU'}</div>", unsafe_allow_html=True)
+        bit = bas.replace(year=bas.year+y)+timedelta(days=g)
+        k = (bit-date.today()).days
+        st.markdown(f"<div class='sonuc-panel'>Bitiş: {bit.strftime('%d.%m.%Y')}<br>{'✅ SÜRE VAR' if k>0 else '❌ DOLDU'}</div>", unsafe_allow_html=True)
 
 # =============================================================================
 # MODÜL 4: İLETİŞİM
 # =============================================================================
 with tabs[3]:
     st.header("İletişim")
-    st.markdown(f"""
-    <div style="border:1px dashed #555; padding:15px; text-align:center;">
-        <a href="mailto:{HAKIM_MAIL}" style="font-size:1.2em; color:#3498db; text-decoration:none;">{HAKIM_MAIL}</a>
-    </div>""", unsafe_allow_html=True)
+    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#0d6efd;'>{HAKIM_MAIL}</a></div>", unsafe_allow_html=True)
     st.text_area("Kendinize Not:", placeholder="Notlarınız cihazda saklanır.")
     st.button("Notu Kaydet")
