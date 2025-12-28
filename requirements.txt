@@ -3,3 +3,6 @@ easyocr
 openai-whisper
 numpy
 Pillow
+pandas
+openpyxl
+requests
