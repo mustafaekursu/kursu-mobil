@@ -1,4 +1,4 @@
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import streamlit as st
 import re
 from datetime import date, timedelta
@@ -129,53 +129,79 @@ with tabs[0]:
                 except Exception as e: st.error(f"Hata: {e}")
             else: st.error("Ses modülü sunucuda aktif değil.")
 
-    # --- 3. FOTOĞRAF GİRİŞİ (GÜÇLENDİRİLMİŞ OCR MOTORU) ---
+    # --- 3. FOTOĞRAF GİRİŞİ (TURBO OCR & FAKS MODU) ---
     elif "Fotoğraf" in secim:
-        st.info("Gelişmiş Algoritma: Fotoğraf taranmadan önce netleştirilecek ve kontrast ayarı yapılacaktır.")
+        st.info("Geliştirilmiş Zeka: Gölge temizleme ve 'Zorla Oku' modları eklendi.")
         img_file = st.file_uploader("Resim Yükle", type=['png', 'jpg', 'jpeg'])
         
         if img_file:
             if Image is None:
-                st.error("⚠️ HATA: Görüntü işleme kütüphanesi (Pillow) eksik.")
+                st.error("⚠️ HATA: Pillow kütüphanesi eksik.")
             else:
-                # 1. Görüntüyü Yükle
                 original_image = Image.open(img_file)
-                st.image(original_image, caption="Orijinal Belge", use_column_width=True)
+                st.image(original_image, caption="Yüklenen Belge", use_column_width=True)
                 
-                if st.button("Belgeyi Tara ve Çözümle 🔍"):
+                # --- GELİŞMİŞ AYARLAR PANELİ ---
+                with st.expander("⚙️ Okuma Ayarları (Yazı Eksik Çıkarsa Burayı Değiştirin)", expanded=True):
+                    okuma_modu = st.selectbox("Tarama Yöntemi:", 
+                                              ["Otomatik (PSM 3)", 
+                                               "Tek Blok Metin (PSM 6 - Önerilen)", 
+                                               "Tek Sütun (PSM 4)"])
+                    
+                    gorsel_islem = st.checkbox("Gölge Temizle (Faks Modu)", value=True, help="Kağıdı tamamen siyah-beyaza çevirir, gölgeleri siler.")
+                
+                if st.button("Belgeyi Tara ve Metne Dök 🔍"):
                     if pytesseract:
                         try:
-                            with st.spinner("Görüntü iyileştiriliyor ve okunuyor..."):
-                                # --- GÖRÜNTÜ İŞLEME (ZEKA KATMANI) ---
-                                # A. Gri Tonlamaya Çevir (Renk gürültüsünü siler)
-                                processed_img = original_image.convert('L')
+                            with st.spinner("Görüntü işleniyor, gölgeler temizleniyor..."):
+                                # 1. BOYUTLANDIRMA (Çok büyük fotoları optimize et)
+                                img = original_image
+                                width, height = img.size
+                                if width > 2500: # Aşırı büyükse küçült (Hız ve bellek için)
+                                    ratio = 2500.0 / width
+                                    new_height = int(height * ratio)
+                                    img = img.resize((2500, new_height), Image.LANCZOS)
                                 
-                                # B. Kontrastı Güçlendir (Yazıyı koyu, kağıdı beyaz yapar)
-                                enhancer = ImageEnhance.Contrast(processed_img)
-                                processed_img = enhancer.enhance(2.0) # 2 kat kontrast
+                                # 2. RENK İŞLEMLERİ
+                                img = img.convert('L') # Griye çevir
                                 
-                                # C. Keskinleştir (Harf kenarlarını belirginleştirir)
-                                processed_img = processed_img.filter(ImageFilter.SHARPEN)
+                                if gorsel_islem:
+                                    # Faks Modu (Adaptive Thresholding benzeri işlem)
+                                    # Önce kontrastı fulle
+                                    enhancer = ImageEnhance.Contrast(img)
+                                    img = enhancer.enhance(2.0)
+                                    # Sonra Siyah-Beyaz yap (Threshold 128)
+                                    img = img.point(lambda x: 0 if x < 140 else 255, '1')
+                                else:
+                                    # Standart Keskinleştirme
+                                    img = img.filter(ImageFilter.SHARPEN)
+
+                                # 3. OCR KONFİGÜRASYONU (MOTOR AYARLARI)
+                                # PSM 3: Tam sayfa otomasyonu
+                                # PSM 6: Tek blok metin (Sayfa yapısını umursama, her şeyi yazı san ve oku) -> YARIM OKUMAYI ÇÖZER
+                                psm_val = 3
+                                if "PSM 6" in okuma_modu: psm_val = 6
+                                elif "PSM 4" in okuma_modu: psm_val = 4
                                 
-                                # --- OCR AYARLARI (OKUMA MODU) ---
-                                # --psm 3: Tam sayfa otomatik segmentasyon (Sayfanın tamamını okuması için şart)
-                                # --oem 3: Varsayılan motor modu
-                                custom_config = r'--oem 3 --psm 3'
+                                custom_config = f'--oem 3 --psm {psm_val}'
                                 
-                                # Okuma İşlemi
-                                text = pytesseract.image_to_string(processed_img, lang='tur', config=custom_config)
+                                # 4. OKUMA
+                                text = pytesseract.image_to_string(img, lang='tur', config=custom_config)
                                 
-                                # Eğer sonuç boşsa bir de İngilizce kütüphanesini destek alarak dene
-                                if len(text) < 5:
-                                    text = pytesseract.image_to_string(processed_img, lang='tur+eng', config=custom_config)
+                                # Yedek: Eğer Türkçe tam sökemezse İngilizce desteğiyle dene
+                                if len(text) < 10:
+                                    text = pytesseract.image_to_string(img, lang='tur+eng', config=custom_config)
                             
-                            st.success("İşlem Tamamlandı!")
-                            st.text_area("Okunan Metin:", value=text, height=300)
+                            if len(text.strip()) > 0:
+                                st.success("Okuma Başarılı!")
+                                st.text_area("Sonuç:", value=text, height=350)
+                            else:
+                                st.warning("Metin okunamadı. Lütfen 'Okuma Ayarları'ndan 'Tek Blok Metin' seçeneğini deneyin.")
                             
                         except Exception as e:
-                            st.error(f"Okuma Hatası: {e}")
+                            st.error(f"Sistem Hatası: {e}")
                     else:
-                        st.error("OCR motoru bulunamadı.")
+                        st.error("OCR motoru (Tesseract) bulunamadı.")
     st.markdown("---")
     # FORMATLAMA BÖLÜMÜ
     c1, c2 = st.columns([1,2])
