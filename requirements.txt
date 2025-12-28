@@ -1,3 +1,5 @@
-ffmpeg
-libsm6
-libxext6
+streamlit
+easyocr
+openai-whisper
+numpy
+Pillow
