@@ -463,12 +463,18 @@ with tabs[2]:
 with tabs[3]:
     st.header("İletişim ve Güvenlik")
     
+    # Güvenlik Bildirimi Kutusu (Yeşil Onaylı)
     st.success("""
-    🛡️ **ÜST DÜZEY GÜVENLİK BİLDİRİMİ**
+    🛡️ **ÜST DÜZEY GÜVENLİK VE GİZLİLİK BİLDİRİMİ**
     
-    1.  **Gizli Depo:** Kodlarınız "Private Repository" içindedir, kimse göremez.
-    2.  **Veri Yok:** Sisteme girilen hiçbir fotoğraf veya metin kaydedilmez.
-    3.  **Anlık İmha:** Sayfa yenilendiğinde RAM'deki her şey silinir.
+    Sayın Hakimim, kullanmakta olduğunuz bu sistem;
+    
+    1.  **Askeri Düzeyde Koruma:** "Private Repository" (Gizli Depo) altyapısı sayesinde kodlara ve verilere sizden başka kimse erişemez.
+    2.  **Veri Sızıntısı Koruması:** Sisteme girdiğiniz hiçbir dava bilgisi, isim, metin veya fotoğraf sunucuda **kaydedilmez**.
+    3.  **Anlık İmha:** Sayfayı yenilediğiniz veya kapattığınız an, tüm geçici veriler RAM üzerinden kalıcı olarak silinir.
+    4.  **Log Tutulmaz:** Sistem hiçbir veri kaydı (log) tutmamaktadır.
+    
+    Gönül rahatlığıyla kullanabilirsiniz.
     """)
     
     st.markdown("---")
