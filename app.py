@@ -129,30 +129,34 @@ with tabs[0]:
             else: st.error("Ses modülü sunucuda aktif değil.")
 
     # --- 3. FOTOĞRAF GİRİŞİ (OCR) ---
+    # --- 3. FOTOĞRAF GİRİŞİ (OCR) ---
     elif "Fotoğraf" in secim:
         st.info("Sistem, yüklenen fotoğraftaki yazıları otomatik olarak tarayacaktır.")
         img_file = st.file_uploader("Resim Yükle", type=['png', 'jpg', 'jpeg'])
         
         if img_file:
-            image = Image.open(img_file)
-            st.image(image, caption="Belge Önizleme", use_column_width=True)
-            
-            if st.button("Fotoğrafı Oku ve Metne Çevir 🔍"):
-                if pytesseract:
-                    try:
-                        st.spinner("Yapay zeka belgeyi okuyor...")
-                        text = pytesseract.image_to_string(image, lang='tur')
-                        if not text.strip(): text = pytesseract.image_to_string(image) # Yedek dil
-                        
-                        ham_girdi = text
-                        st.success("Okuma Başarılı!")
-                        st.text_area("Okunan Metin:", value=ham_girdi, height=200)
-                    except Exception as e:
-                        st.error(f"Okuma Hatası: {e}")
-                        st.warning("Not: GitHub'da 'packages.txt' dosyası oluşturup içine 'tesseract-ocr' yazdığınızdan emin olun.")
-                else:
-                    st.error("OCR modülü bulunamadı.")
-
+            # Önce kütüphane var mı diye kontrol et (ÇÖKMEYİ ENGELLEYEN KISIM)
+            if Image is None:
+                st.error("⚠️ HATA: Görüntü işleme kütüphanesi (Pillow) eksik.")
+                st.warning("Lütfen GitHub'da 'requirements.txt' dosyası oluşturup içine 'Pillow' yazdığınızdan emin olun.")
+            else:
+                image = Image.open(img_file)
+                st.image(image, caption="Belge Önizleme", use_column_width=True)
+                
+                if st.button("Fotoğrafı Oku ve Metne Çevir 🔍"):
+                    if pytesseract:
+                        try:
+                            st.spinner("Yapay zeka belgeyi okuyor...")
+                            text = pytesseract.image_to_string(image, lang='tur')
+                            if not text.strip(): text = pytesseract.image_to_string(image) 
+                            
+                            ham_girdi = text
+                            st.success("Okuma Başarılı!")
+                            st.text_area("Okunan Metin:", value=ham_girdi, height=200)
+                        except Exception as e:
+                            st.error(f"Okuma Hatası: {e}")
+                    else:
+                        st.error("OCR modülü (Tesseract) bulunamadı.")
     st.markdown("---")
     # FORMATLAMA BÖLÜMÜ
     c1, c2 = st.columns([1,2])
@@ -266,7 +270,7 @@ with tabs[3]:
     
     st.markdown("---")
     st.subheader("Geliştirici İletişim")
-    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold;'>📧 Geliştiriciye Mail Gönder</a></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold;'>📧 {HAKIM_MAIL}</a></div>", unsafe_allow_html=True)
     
     st.write("")
     st.text_area("Kendinize Şifreli Not Bırakın (Cihaz Önbelleğinde Kalır):")
