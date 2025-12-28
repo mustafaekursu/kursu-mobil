@@ -1,14 +1,14 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
+from PIL import Image, ImageOps, ImageFilter
+import pytesseract
 import re
 from datetime import date, timedelta
-import io
 
 # =============================================================================
 # 🟢 AYARLAR & GÖRÜNÜM
 # =============================================================================
-st.set_page_config(page_title="KÜRSÜ PRO AI", page_icon="⚖️", layout="centered")
+st.set_page_config(page_title="KÜRSÜ PRO HİBRİT", page_icon="⚖️", layout="centered")
 
 # CSS: RESMİ ADLİYE TEMASI
 st.markdown("""
@@ -25,73 +25,93 @@ st.markdown("""
         background-color: #2c3e50; color: white !important; padding: 20px; border-radius: 8px; margin-top: 15px; border-left: 6px solid #f1c40f;
     }
     .sonuc-panel * { color: white !important; }
-    .tutanak-kagidi {
-        background-color: white; color: black !important; padding: 40px; border: 2px solid #000; font-family: 'Times New Roman', serif; margin-top: 20px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("⚖️ KÜRSÜ PRO: v5.0 (AI)")
-st.caption("Google Gemini Vision Destekli | %99.9 Doğruluk")
-
-# --- API ANAHTARI GİRİŞİ (Güvenlik İçin Yan Menüde) ---
-with st.sidebar:
-    st.header("🔑 Yapay Zeka Anahtarı")
-    api_key = st.text_input("Google API Key", type="password", help="aistudio.google.com adresinden aldığınız AIza... ile başlayan anahtarı buraya yapıştırın.")
-    if api_key:
-        genai.configure(api_key=api_key)
-        st.success("Yapay Zeka Aktif! 🟢")
+# =============================================================================
+# 🔑 GÜVENLİ ANAHTAR YÖNETİMİ
+# =============================================================================
+try:
+    if "GOOGLE_API_KEY" in st.secrets:
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        AI_AKTIF = True
     else:
-        st.warning("Fotoğraf okumak için API Key giriniz.")
+        AI_AKTIF = False
+except:
+    AI_AKTIF = False
 
-tabs = st.tabs(["📷 DOSYA OKUMA (AI)", "⛓️ CEZA İLAMI", "⏳ ZAMANAŞIMI", "📧 İLETİŞİM"])
+st.title("⚖️ KÜRSÜ PRO: v6.0 (HİBRİT)")
+st.caption("Hem Yapay Zeka (Online) Hem Dahili Motor (Offline) Bir Arada")
+
+tabs = st.tabs(["📷 HİBRİT OKUYUCU", "⛓️ CEZA HESAPLA", "⏳ ZAMANAŞIMI", "📧 İLETİŞİM"])
 
 # =============================================================================
-# MODÜL 1: YAPAY ZEKA İLE DOSYA OKUMA
+# MODÜL 1: HİBRİT DOSYA OKUMA (SEÇMELİ)
 # =============================================================================
 with tabs[0]:
-    st.header("Yapay Zeka Belge Analizi")
-    st.info("Bu modül, fotoğrafı Tesseract ile değil, doğrudan **Google Gemini** ile okur. Gölge, yamukluk veya el yazısı fark etmez.")
+    st.header("Belge Okuma Merkezi")
+    
+    # KULLANICIYA MOTOR SEÇTİRİYORUZ
+    motor_secimi = st.radio("Kullanılacak Motor:", 
+                            ["🚀 Google Yapay Zeka (İnternet Gerekir - %99 Başarı)", 
+                             "🛠️ Dahili Motor (Daha Az İnternet - %80 Başarı)"])
 
-    img_file = st.file_uploader("Duruşma Tutanağı / Karar Fotoğrafı Yükle", type=['png', 'jpg', 'jpeg'])
+    img_file = st.file_uploader("Belge Fotoğrafı Yükle", type=['png', 'jpg', 'jpeg'])
     
     if img_file:
         image = Image.open(img_file)
         st.image(image, caption="Yüklenen Belge", use_column_width=True)
         
-        if st.button("YAPAY ZEKA İLE OKU (KESİN SONUÇ) 🚀", use_container_width=True):
-            if not api_key:
-                st.error("Lütfen sol menüden Google API Anahtarınızı giriniz.")
-            else:
+        # --- SEÇENEK A: GOOGLE YAPAY ZEKA ---
+        if "Google" in motor_secimi:
+            if st.button("YAPAY ZEKA İLE OKU 🚀", use_container_width=True):
+                if not AI_AKTIF:
+                    st.error("⚠️ API Anahtarı (Secrets) bulunamadı. Ayarlarınızı kontrol edin.")
+                else:
+                    try:
+                        with st.spinner("Google Gemini belgeyi inceliyor..."):
+                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            prompt = "Sen uzman bir katipsin. Bu hukuki belgeyi harf hatası yapmadan, düzgün bir Türkçe ile metne dök. 'GANKARA' gibi hataları 'ANKARA' olarak düzelt."
+                            response = model.generate_content([prompt, image])
+                            st.success("Yapay Zeka Okuması Tamamlandı!")
+                            st.text_area("Sonuç:", value=response.text, height=500)
+                    except Exception as e:
+                        st.error(f"İnternet Hatası: {e}. Lütfen 'Dahili Motor' seçeneğine geçin.")
+
+        # --- SEÇENEK B: DAHİLİ MOTOR (TESSERACT - ESKİ USÜL) ---
+        else:
+            st.info("💡 Dahili motor (Tesseract) seçildi. İnternet zayıfsa bu mod idealdir.")
+            
+            # Eski Görüntü İşleme Ayarları
+            with st.expander("Görüntü Ayarları (Okunmazsa Oynayın)"):
+                esik = st.slider("Siyah/Beyaz Dengesi", 50, 230, 140)
+                dondur = st.slider("Döndür", -5.0, 5.0, 0.0)
+            
+            if st.button("DAHİLİ MOTOR İLE OKU 🛠️", use_container_width=True):
                 try:
-                    with st.spinner("Gemini Yapay Zekası belgeyi inceliyor (Bu işlem 3-5 saniye sürer)..."):
-                        # Google Gemini Modelini Çağır
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                    with st.spinner("Dahili motor çalışıyor..."):
+                        # 1. Döndür
+                        img = image.rotate(-dondur, expand=True, fillcolor='white')
+                        # 2. Griye Çevir & Eşikleme
+                        img = img.convert('L').point(lambda x: 0 if x < esik else 255, '1')
+                        # 3. Kenar Boşluğu
+                        img = ImageOps.expand(img, border=50, fill='white')
                         
-                        # Yapay Zekaya Emir Veriyoruz
-                        prompt = """
-                        Sen uzman bir Türk Ağır Ceza Mahkemesi Katibisin. 
-                        Görevin: Bu fotoğraftaki hukuki metni birebir, harf hatası yapmadan dışarı aktarmak.
+                        # Okuma
+                        custom_config = r'--oem 3 --psm 6'
+                        text = pytesseract.image_to_string(img, lang='tur', config=custom_config)
                         
-                        Kurallar:
-                        1. Asla yorum yapma, sadece metni ver.
-                        2. "GANKARA" gibi hataları "ANKARA" olarak düzelt.
-                        3. "ESASNO" gibi yapışık kelimeleri "ESAS NO" olarak ayır.
-                        4. Metni düzgün paragraflar halinde ver.
-                        5. Rakamlara (TCKN, Dosya No) çok dikkat et.
-                        """
+                        # Temizlik
+                        text = text.replace("|", "").replace("~", "")
+                        text = text.replace("-\n", "").replace("\n", " ")
                         
-                        response = model.generate_content([prompt, image])
-                        text = response.text
-                        
-                        st.success("Okuma Başarılı! Yapay Zeka Analizi Tamamlandı.")
-                        st.text_area("Yapay Zeka Çıktısı:", value=text, height=500)
-                        
+                        st.success("Dahili Okuma Tamamlandı!")
+                        st.text_area("Sonuç:", value=text, height=500)
                 except Exception as e:
-                    st.error(f"Bağlantı Hatası: {e}")
+                    st.error(f"Motor Hatası: {e}. (GitHub'da packages.txt içinde tesseract-ocr var mı?)")
 
 # =============================================================================
-# MODÜL 2: CEZA İLAMI (HAPİS + PARA)
+# MODÜL 2: CEZA İLAMI
 # =============================================================================
 with tabs[1]:
     st.header("Ceza Hesaplama")
@@ -100,81 +120,58 @@ with tabs[1]:
     with c2: ta = st.number_input("Hapis (Ay)", 0, 11, 0)
     with c3: tg = st.number_input("Hapis (Gün)", 0, 29, 0)
     with c4: base_para = st.number_input("Adli Para (Gün)", 0, 99999, 5)
-
+    
     st.divider()
+    # Artırım / İndirim
     col_a, col_i = st.columns(2)
     with col_a:
-        st.subheader("⬆️ Artırım")
-        amod = st.radio("Tip", ["Liste", "Manuel"], key="art_m", horizontal=True)
-        ap, apd = 0, 1
-        if amod == "Liste":
-            s = st.selectbox("Oran", ["Yok", "1/6", "1/4", "1/3", "1/2", "1 Kat"], key="art_s")
-            if s != "Yok": 
-                if "Kat" in s: ap, apd = int(s.split()[0]), 1
-                else: ap, apd = map(int, s.split('/'))
+        amod = st.radio("Artırım", ["Liste", "Manuel"], horizontal=True)
+        ap, apd = (0,1)
+        if amod=="Liste":
+            s = st.selectbox("Oran", ["Yok","1/6","1/4","1/3","1/2","1 Kat"])
+            if s!="Yok": ap,apd = (int(s.split()[0]),1) if "Kat" in s else map(int, s.split('/'))
         else: ap=st.number_input("Pay",0,10,0,key="ap"); apd=st.number_input("Payda",1,20,1,key="apd")
-
-    with col_i:
-        st.subheader("⬇️ İndirim")
-        imod = st.radio("Tip", ["Liste", "Manuel"], key="ind_m", horizontal=True)
-        ip, ipd = 0, 1
-        if imod == "Liste":
-            si = st.selectbox("Oran", ["Yok", "1/6 (TCK 62)", "1/3", "1/2", "2/3"], key="ind_s")
-            if si != "Yok": ip, ipd = map(int, si.split(' ')[0].split('/'))
-        else: ip=st.number_input("Pay",0,10,0,key="ip"); ipd=st.number_input("Payda",1,20,1,key="ipd")
-
-    # Hesaplama
-    total_hapis = (ty * 360) + (ta * 30) + tg
-    total_para = base_para
-    
-    if ap > 0:
-        total_hapis += (total_hapis * ap) / apd
-        total_para += (total_para * ap) / apd
-    if ip > 0:
-        total_hapis -= (total_hapis * ip) / ipd
-        total_para -= (total_para * ip) / ipd
         
-    sy, rg = divmod(total_hapis, 360); sa, sg = divmod(rg, 30)
+    with col_i:
+        imod = st.radio("İndirim", ["Liste", "Manuel"], horizontal=True)
+        ip, ipd = (0,1)
+        if imod=="Liste":
+            si = st.selectbox("Oran ", ["Yok","1/6 (TCK 62)","1/3","1/2","2/3"])
+            if si!="Yok": ip,ipd = map(int, si.split(' ')[0].split('/'))
+        else: ip=st.number_input("Pay ",0,10,0,key="ip"); ipd=st.number_input("Payda ",1,20,1,key="ipd")
+
+    # Hesap
+    total = (ty*360 + ta*30 + tg)
+    total_p = base_para
+    if ap>0: total += (total*ap)/apd; total_p += (total_p*ap)/apd
+    if ip>0: total -= (total*ip)/ipd; total_p -= (total_p*ip)/ipd
     
-    st.markdown(f"""
-    <div class="sonuc-panel">
-        <h3>HÜKÜM: {int(sy)} Yıl, {int(sa)} Ay, {int(sg)} Gün Hapis</h3>
-        <h3>ADLİ PARA: {int(total_para)} Gün</h3>
-    </div>""", unsafe_allow_html=True)
-    
-    if int(total_para) > 0:
-        val = st.number_input("Para Günlüğü (TL)", 20, 500, 100)
-        st.success(f"💸 Ödenecek: **{int(total_para * val):,} TL**")
+    y,r = divmod(total, 360); m,d = divmod(r, 30)
+    st.markdown(f"<div class='sonuc-panel'><h3>{int(y)} Yıl, {int(m)} Ay, {int(d)} Gün</h3>Adli Para: {int(total_p)} Gün</div>", unsafe_allow_html=True)
 
 # =============================================================================
-# MODÜL 3: ZAMANAŞIMI
+# MODÜL 3: ZAMANAŞIMI (ÖZET)
 # =============================================================================
 with tabs[2]:
     st.header("Zamanaşımı")
-    # (Önceki kodun aynısı - Özetlendi)
-    tur = st.selectbox("Tür", ["Ceza Davası", "Hukuk Davası"])
-    if "Ceza" in tur:
+    tur = st.selectbox("Hesap Türü", ["Ceza", "Hukuk"])
+    if tur=="Ceza":
         suc = st.date_input("Suç Tarihi", date(2015,1,1))
-        sinir = st.selectbox("Üst Sınır", ["Ağırlaştırılmış", "Müebbet", ">20 Yıl", "5-20 Yıl", "<5 Yıl"])
-        asli = 8
-        if "Ağır" in sinir: asli=30
-        elif "Müebbet" in sinir: asli=25
-        elif ">20" in sinir: asli=20
-        elif "5-20" in sinir: asli=15
-        
-        kesme = st.radio("Kesilme Var mı?", ["Yok", "Var"])
-        durma = st.number_input("Durma (Gün)", 0)
-        
-        son = asli * 1.5 if "Var" in kesme else asli
-        bitis = suc.replace(year=suc.year + int(son)) + timedelta(days=durma)
+        ust = st.selectbox("Üst Sınır", [">20 Yıl", "5-20 Yıl", "<5 Yıl"])
+        asli = 20 if ">20" in ust else (15 if "5-20" in ust else 8)
+        kes = st.checkbox("Kesilme Var mı?")
+        son = asli * 1.5 if kes else asli
+        bitis = suc.replace(year=suc.year + int(son))
         kalan = (bitis - date.today()).days
-        st.markdown(f"<div class='sonuc-panel'>Bitiş: {bitis.strftime('%d.%m.%Y')}<br>{'✅ DEVAM' if kalan>0 else '❌ DOLDU'}</div>", unsafe_allow_html=True)
+        st.write(f"Bitiş: {bitis.strftime('%d.%m.%Y')} ({'✅ SÜRE VAR' if kalan>0 else '❌ DOLDU'})")
     else:
-        st.info("Hukuk modülü v4.0 ile aynıdır.")
+        bas = st.date_input("Başlangıç", date.today())
+        y = st.number_input("Yıl", 10)
+        st.write(f"Bitiş: {bas.replace(year=bas.year+y).strftime('%d.%m.%Y')}")
 
 # =============================================================================
 # MODÜL 4: İLETİŞİM
 # =============================================================================
 with tabs[3]:
-    st.success("Güvenlik: API Anahtarınız sunucuda kaydedilmez, sadece anlık işlemde kullanılır.")
-    st.markdown(f"📧 Geliştirici: mustafa.emin.tr@hotmail.com")
+    st.success("Güvenlik: Secrets kasası korunmaktadır.")
+    st.markdown("📧 Geliştirici: mustafa.emin.tr@hotmail.com")
