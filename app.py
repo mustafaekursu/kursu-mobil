@@ -129,73 +129,90 @@ with tabs[0]:
                 except Exception as e: st.error(f"Hata: {e}")
             else: st.error("Ses modülü sunucuda aktif değil.")
 
-    # --- 3. FOTOĞRAF GİRİŞİ (MANUEL EŞİK & KESİN TARAMA) ---
+    # --- 3. FOTOĞRAF GİRİŞİ (PROFESYONEL TAM SAYFA & KENAR GENİŞLETME) ---
     elif "Fotoğraf" in secim:
-        st.info("Profesyonel Mod: Aşağıdaki 'Siyah/Beyaz Ayarı' çubuğunu kullanarak yazıları en net hale getirin.")
+        st.info("Tam Sayfa Modu: Kenar boşlukları otomatik eklenir, yazılar merkeze alınır.")
         img_file = st.file_uploader("Resim Yükle", type=['png', 'jpg', 'jpeg'])
         
         if img_file:
             if Image is None:
                 st.error("⚠️ HATA: Pillow kütüphanesi eksik.")
             else:
-                # Orijinal resmi yükle
                 original_image = Image.open(img_file)
                 
-                # --- GÖRÜNTÜ ÖN İŞLEME PANELİ ---
-                st.markdown("#### ⚙️ Görüntü Ayarı (En Önemli Kısım)")
+                # --- PROFESYONEL AYAR PANELI ---
+                st.markdown("#### 🎛️ Görüntü Laboratuvarı")
                 
-                # 1. Kullanıcıya Eşik Değeri Seçtir (Threshold)
-                # Bu, gri alanları beyaza, koyu alanları siyaha çevirir.
-                esik_degeri = st.slider("Siyah/Beyaz Dengesini Ayarla", 50, 200, 140, help="Sola çekerseniz yazı incelir, sağa çekerseniz kalınlaşır.")
+                # 1. Eşik Ayarı (Sizin sevdiğiniz özellik)
+                esik_degeri = st.slider("Siyah/Beyaz Keskinlik Ayarı", 50, 230, 145, help="Yazılar silikse sola, çok kalınsa sağa çekin.")
                 
-                # 2. Canlı Önizleme Yap (İşlenmiş halini göster)
-                img = original_image
-                w, h = img.size
-                if w < 1500: # Çözünürlüğü artır (Netlik için şart)
-                    img = img.resize((w*2, h*2), Image.LANCZOS)
-                
-                img = img.convert('L') # Griye çevir
-                # Eşikleme (Thresholding) işlemi - İşte Sır Burası
-                img = img.point(lambda x: 0 if x < esik_degeri else 255, '1')
-                
-                # İşlenmiş resmi göster
-                st.image(img, caption="Sistem Bu Görüntüyü Okuyacak (Yazılar net mi?)", use_column_width=True)
-                
-                c_okuma, c_ayar = st.columns([2, 1])
-                with c_ayar:
-                     psm_mod = st.selectbox("Blok Modu", ["PSM 6 (Tek Blok)", "PSM 3 (Otomatik)"], help="Metin karışırsa bunu değiştirin.")
-                
-                with c_okuma:
-                    st.write("") # Boşluk
-                    if st.button("BU GÖRÜNTÜYÜ OKU 🔍", use_container_width=True):
-                        if pytesseract:
-                            try:
-                                with st.spinner("Okunuyor..."):
-                                    # OCR Ayarları
-                                    psm = 6 if "PSM 6" in psm_mod else 3
-                                    custom_config = f'--oem 3 --psm {psm}'
-                                    
-                                    # Okuma
-                                    text = pytesseract.image_to_string(img, lang='tur', config=custom_config)
-                                    
-                                    # İngilizce yedek (Sayılar ve özel karakterler için)
-                                    if len(text) < 10:
-                                        text = pytesseract.image_to_string(img, lang='tur+eng', config=custom_config)
-                                    
-                                    # Temizlik
-                                    text = text.replace("|", "").replace("~", "")
-                                    # Satır birleştirme (Kopuk cümleleri düzelt)
-                                    text = text.replace("-\n", "")
-                                    text = text.replace("\n", " ")
-                                    text = re.sub(r'\s+', ' ', text) # Fazla boşlukları sil
-                                    
-                                st.success("İşlem Tamamlandı!")
-                                st.text_area("Sonuç Metni:", value=text.strip(), height=400)
+                c1, c2 = st.columns(2)
+                with c1:
+                    # Yazı Kalınlaştırma (Silik fotokopiler için hayat kurtarır)
+                    kalinlastir = st.checkbox("Yazıları Kalınlaştır", value=False, help="Çok ince veya silik yazıları okumak için işaretleyin.")
+                with c2:
+                    # Tarama Modu
+                    psm_mod = st.selectbox("Blok Modu", ["PSM 6 (Tek Blok - Standart)", "PSM 3 (Otomatik - Tablolu)", "PSM 4 (Tek Sütun)"], index=0)
+
+                if st.button("BELGEYİ ANALİZ ET VE OKU 🔍", use_container_width=True):
+                    if pytesseract:
+                        try:
+                            with st.spinner("Görüntü genişletiliyor ve işleniyor..."):
+                                img = original_image
                                 
-                            except Exception as e:
-                                st.error(f"Hata: {e}")
-                        else:
-                            st.error("OCR Motoru Bulunamadı.")
+                                # A. KENAR BOŞLUĞU EKLEME (padding) - EKSİK OKUMAYI ÇÖZEN KISIM
+                                # Tesseract kenardaki yazıları kaçırmasın diye etrafa 50px beyaz şerit çekiyoruz
+                                img = ImageOps.expand(img, border=50, fill='white')
+                                
+                                # B. YÜKSEK ÇÖZÜNÜRLÜK (Upscaling)
+                                w, h = img.size
+                                # Standart A4 boyutuna yaklaştır (min genişlik 2000px olsun)
+                                if w < 2000:
+                                    ratio = 2000.0 / w
+                                    new_h = int(h * ratio)
+                                    img = img.resize((2000, new_h), Image.LANCZOS)
+                                
+                                # C. GRİ TONLAMA & EŞİKLEME (Threshold)
+                                img = img.convert('L')
+                                img = img.point(lambda x: 0 if x < esik_degeri else 255, '1')
+                                
+                                # D. KALINLAŞTIRMA (Dilation Benzeri) - OPSİYONEL
+                                if kalinlastir:
+                                    # MinFilter(3) siyah pikselleri (yazıyı) etrafa yayar, harfleri dolgunlaştırır
+                                    img = img.filter(ImageFilter.MinFilter(3))
+                                
+                                # SİSTEMİN GÖRDÜĞÜNÜ KULLANICIYA GÖSTER
+                                st.image(img, caption="Sistemin Okuduğu (İşlenmiş) Belge", use_column_width=True)
+                                
+                                # E. OCR İŞLEMİ
+                                psm = 6 # Varsayılan
+                                if "PSM 3" in psm_mod: psm = 3
+                                elif "PSM 4" in psm_mod: psm = 4
+                                
+                                custom_config = f'--oem 3 --psm {psm}'
+                                text = pytesseract.image_to_string(img, lang='tur', config=custom_config)
+                                
+                                # İngilizce destekli 2. geçiş (Eğer çok az veri varsa)
+                                if len(text) < 50:
+                                    text = pytesseract.image_to_string(img, lang='tur+eng', config=custom_config)
+                                
+                                # F. METİN TEMİZLİĞİ (Geliştirilmiş)
+                                # OCR hatalarını temizle (| ~ _ gibi)
+                                text = re.sub(r'[|~_©®]', '', text)
+                                # Satır sonu tirelerini birleştir (Mahke- mesi -> Mahkemesi)
+                                text = text.replace("-\n", "")
+                                # Gereksiz satır başlarını kaldır (Paragraf bütünlüğü)
+                                text = text.replace("\n", " ")
+                                # Fazla boşlukları sil
+                                text = re.sub(r'\s+', ' ', text)
+                                
+                            st.success("Analiz Tamamlandı!")
+                            st.text_area("Çıkarılan Metin:", value=text.strip(), height=450)
+                            
+                        except Exception as e:
+                            st.error(f"Kritik Hata: {e}")
+                    else:
+                        st.error("OCR Motoru Bulunamadı.")
     st.markdown("---")
     # FORMATLAMA BÖLÜMÜ
     c1, c2 = st.columns([1,2])
