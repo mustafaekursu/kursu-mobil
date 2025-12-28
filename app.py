@@ -129,9 +129,9 @@ with tabs[0]:
                 except Exception as e: st.error(f"Hata: {e}")
             else: st.error("Ses modülü sunucuda aktif değil.")
 
-    # --- 3. FOTOĞRAF GİRİŞİ (KIRPMA, TEMİZLEME & PROFESYONEL OCR) ---
+    # --- 3. FOTOĞRAF GİRİŞİ (ROTASYON, SÖZLÜK VE HASSAS OCR) ---
     elif "Fotoğraf" in secim:
-        st.info("Profesyonel Stüdyo Modu: Gölge yapan kenarları kırpın ve netleştirin.")
+        st.info("Nihai Profesyonel Mod: Döndürme, Kırpma ve Hukuki Sözlük Desteği.")
         img_file = st.file_uploader("Resim Yükle", type=['png', 'jpg', 'jpeg'])
         
         if img_file:
@@ -140,73 +140,87 @@ with tabs[0]:
             else:
                 original_image = Image.open(img_file)
                 
-                # --- A. KIRPMA PANELİ (GÖLGELERİ YOK ETMEK İÇİN) ---
-                st.markdown("#### 1. ✂️ Kenar Temizliği (Siyah gölgeleri kesip atın)")
-                w_org, h_org = original_image.size
+                # --- A. KIRPMA VE DÖNDÜRME PANELİ ---
+                st.markdown("#### 1. 📐 Geometri Ayarları (Yamuksa Düzeltin)")
                 
-                c_sol, c_sag, c_ust, c_alt = st.columns(4)
-                with c_sol: sol_kirp = st.number_input("Solu Kırp", 0, 500, 0, step=10, help="Soldaki siyah gölgeyi keser.")
-                with c_sag: sag_kirp = st.number_input("Sağı Kırp", 0, 500, 0, step=10)
-                with c_ust: ust_kirp = st.number_input("Üstü Kırp", 0, 500, 0, step=10)
-                with c_alt: alt_kirp = st.number_input("Altı Kırp", 0, 500, 0, step=10)
+                # ROTASYON (Yeni Özellik)
+                rotasyon = st.slider("Belgeyi Döndür (Düzeltmek için)", -10.0, 10.0, 0.0, step=0.1, help="Belge eğikse okuma bozulur. Buradan düzeltin.")
                 
-                # KIRPMA İŞLEMİ
-                # Resmin kenarlarından belirtilen piksel kadar kesiyoruz
-                img = original_image.crop((sol_kirp, ust_kirp, w_org - sag_kirp, h_org - alt_kirp))
+                # Resmi önce döndür
+                img = original_image.rotate(-rotasyon, expand=True, fillcolor='white') # Eksi değer sağa yatırır
                 
-                # --- B. GÖRÜNTÜ NETLEŞTİRME PANELİ ---
-                st.markdown("#### 2. 🎛️ Netlik ve Kontrast")
-                esik = st.slider("Siyah/Beyaz Dengesi (Threshold)", 50, 220, 130, help="Yazılar netleşene kadar kaydırın.")
+                st.markdown("#### 2. ✂️ Kenar Temizliği (Siyahlıkları Kesin)")
+                w_org, h_org = img.size
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: sol = st.number_input("Sol", 0, 500, 0, step=10)
+                with c2: sag = st.number_input("Sağ", 0, 500, 0, step=10)
+                with c3: ust = st.number_input("Üst", 0, 500, 0, step=10)
+                with c4: alt = st.number_input("Alt", 0, 500, 0, step=10)
                 
-                # GÖRÜNTÜYÜ İŞLEME MOTORU
-                # 1. Büyütme (Upscale) - Küçük harfler için kritik
+                # Kırpma
+                img = img.crop((sol, ust, w_org - sag, h_org - alt))
+                
+                # --- B. NETLİK PANELİ ---
+                st.markdown("#### 3. 🎛️ Netlik Ayarı")
+                esik = st.slider("Siyah/Beyaz Dengesi (Threshold)", 50, 230, 140)
+                
+                # İŞLEME MOTORU
+                # 1. Büyütme (Upscale - 2.5 kat)
                 w, h = img.size
-                if w < 2000:
-                    img = img.resize((2000, int(h * (2000/w))), Image.LANCZOS)
+                if w < 2500:
+                    img = img.resize((2500, int(h * (2500/w))), Image.LANCZOS)
                 
-                # 2. Griye Çevir ve Eşikleme (Threshold)
+                # 2. Eşikleme
                 img_gray = img.convert('L')
-                # Piksel parlaklığı eşik değerinden küçükse 0 (siyah), büyükse 255 (beyaz) yap
-                img_bin = img_gray.point(lambda x: 0 if x < esik else 255, '1')
+                final_img = img_gray.point(lambda x: 0 if x < esik else 255, '1')
                 
-                # 3. Güvenlik Şeridi (Padding) - Kenar yazıları için
-                # Kırptıktan sonra Tesseract rahat okusun diye etrafa 50px bembeyaz çerçeve ekliyoruz
-                final_img = ImageOps.expand(img_bin, border=50, fill='white')
+                # 3. Kenar Boşluğu (Padding)
+                final_img = ImageOps.expand(final_img, border=50, fill='white')
                 
-                # CANLI ÖNİZLEME (Kullanıcı neyi onaylıyorsa o okunacak)
-                st.image(final_img, caption="Sistemin Okuyacağı Nihai Belge", use_column_width=True)
+                st.image(final_img, caption="Sistemin Okuyacağı Belge (Düz ve Net mi?)", use_column_width=True)
                 
-                if st.button("BU TEMİZ GÖRÜNTÜYÜ METNE DÖK 🚀", use_container_width=True):
+                if st.button("ANALİZ ET VE DÜZELT 🚀", use_container_width=True):
                     if pytesseract:
                         try:
-                            with st.spinner("Yapay zeka metni söküyor..."):
-                                # OCR Konfigürasyonu
-                                # --psm 6: Tek blok metin (Karmaşık düzenleri yok sayar, satır satır okur)
-                                # --psm 4: Tek sütun (Eğer PSM 6 karıştırırsa bu denenebilir)
-                                custom_config = r'--oem 3 --psm 6'
+                            with st.spinner("1/2 Metin Sökülüyor..."):
+                                # OCR AYARLARI (KRİTİK GÜNCELLEME)
+                                # preserve_interword_spaces=1: Kelimelerin yapışmasını engeller
+                                custom_config = r'--oem 3 --psm 6 -c preserve_interword_spaces=1'
                                 
                                 text = pytesseract.image_to_string(final_img, lang='tur', config=custom_config)
-                                
-                                # İngilizce destekli 2. geçiş (Rakamlar ve kodlar için)
-                                if len(text) < 50:
+                                if len(text) < 50: # Yedek
                                     text = pytesseract.image_to_string(final_img, lang='tur+eng', config=custom_config)
                                 
-                                # --- C. METİN TEMİZLEME ALGORİTMASI ---
-                                # 1. Yaygın OCR hatalarını düzelt
-                                text = text.replace('|', '').replace('~', '').replace('`', '')
+                            with st.spinner("2/2 Hukuki Sözlük ile Düzeltiliyor..."):
+                                # --- C. HUKUKİ OTO-DÜZELTME (POST-PROCESSING) ---
+                                # Yaygın OCR hatalarını manuel düzeltiyoruz
+                                corrections = {
+                                    "GANKARA": "ANKARA", "0ANKARA": "ANKARA", "G ANKARA": "ANKARA",
+                                    "MÖZTEKİN": "M.ÖZTEKİN", "MÖZTEKIN": "M.ÖZTEKİN",
+                                    "ESASNO": "ESAS NO", "ESAS No": "ESAS NO",
+                                    "KARARTARİHİ": "KARAR TARİHİ", "KARAR TARIHI": "KARAR TARİHİ",
+                                    "SıNıK": "SANIK", "SANIKLAR": "SANIK(LAR)",
+                                    "KATıLAN": "KATILAN", "MÜDAFİİ": "MÜDAFİİ",
+                                    "İDDİANAME": "İDDİANAME", "IDDIANAME": "İDDİANAME",
+                                    "TCK": "TCK", "CMK": "CMK",
+                                    "|": "", "~": "", "`": "", "©": "", "®": ""
+                                }
                                 
-                                # 2. Satır sonu birleştirmeleri
-                                text = text.replace("-\n", "")     # Kelime bölünmesini düzelt
-                                text = text.replace("\n", " ")     # Satırları birleştir (Paragraf yap)
-                                text = re.sub(r'\s+', ' ', text)   # Çift boşlukları sil
+                                # Önce genel temizlik
+                                text = text.replace("-\n", "")
+                                text = text.replace("\n", " ")
+                                text = re.sub(r'\s+', ' ', text) # Çift boşlukları sil
                                 
-                                # 3. Özel Hukuki Düzeltmeler (Dictionary Correction)
-                                text = text.replace("MÖZTEKİN", "M.ÖZTEKİN") # Sizin örnekteki hata
-                                text = text.replace("SıNıK", "SANIK")
-                                text = text.replace("KATıLAN", "KATILAN")
+                                # Sözlükteki hataları bul ve değiştir
+                                for hatali, dogru in corrections.items():
+                                    text = text.replace(hatali, dogru)
+                                    
+                                # Regex ile daha akıllı düzeltmeler
+                                # Örn: "2024450" gibi yapışık sayıları ayırmak zordur ama "No:" sonrası boşluk garantileyebiliriz
+                                text = re.sub(r'(No:)(\S)', r'\1 \2', text) # No:2024 -> No: 2024
                             
-                            st.success("İşlem Başarılı!")
-                            st.text_area("Çıkarılan Metin:", value=text.strip(), height=450)
+                            st.success("İşlem Başarılı! Hukuki terimler düzeltildi.")
+                            st.text_area("Sonuç Metni:", value=text.strip(), height=450)
                             
                         except Exception as e:
                             st.error(f"Hata: {e}")
