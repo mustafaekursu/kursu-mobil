@@ -1,3 +1,4 @@
+from PIL import Image, ImageEnhance, ImageFilter
 import streamlit as st
 import re
 from datetime import date, timedelta
@@ -128,35 +129,53 @@ with tabs[0]:
                 except Exception as e: st.error(f"Hata: {e}")
             else: st.error("Ses modülü sunucuda aktif değil.")
 
-    # --- 3. FOTOĞRAF GİRİŞİ (OCR) ---
-    # --- 3. FOTOĞRAF GİRİŞİ (OCR) ---
+    # --- 3. FOTOĞRAF GİRİŞİ (GÜÇLENDİRİLMİŞ OCR MOTORU) ---
     elif "Fotoğraf" in secim:
-        st.info("Sistem, yüklenen fotoğraftaki yazıları otomatik olarak tarayacaktır.")
+        st.info("Gelişmiş Algoritma: Fotoğraf taranmadan önce netleştirilecek ve kontrast ayarı yapılacaktır.")
         img_file = st.file_uploader("Resim Yükle", type=['png', 'jpg', 'jpeg'])
         
         if img_file:
-            # Önce kütüphane var mı diye kontrol et (ÇÖKMEYİ ENGELLEYEN KISIM)
             if Image is None:
                 st.error("⚠️ HATA: Görüntü işleme kütüphanesi (Pillow) eksik.")
-                st.warning("Lütfen GitHub'da 'requirements.txt' dosyası oluşturup içine 'Pillow' yazdığınızdan emin olun.")
             else:
-                image = Image.open(img_file)
-                st.image(image, caption="Belge Önizleme", use_column_width=True)
+                # 1. Görüntüyü Yükle
+                original_image = Image.open(img_file)
+                st.image(original_image, caption="Orijinal Belge", use_column_width=True)
                 
-                if st.button("Fotoğrafı Oku ve Metne Çevir 🔍"):
+                if st.button("Belgeyi Tara ve Çözümle 🔍"):
                     if pytesseract:
                         try:
-                            st.spinner("Yapay zeka belgeyi okuyor...")
-                            text = pytesseract.image_to_string(image, lang='tur')
-                            if not text.strip(): text = pytesseract.image_to_string(image) 
+                            with st.spinner("Görüntü iyileştiriliyor ve okunuyor..."):
+                                # --- GÖRÜNTÜ İŞLEME (ZEKA KATMANI) ---
+                                # A. Gri Tonlamaya Çevir (Renk gürültüsünü siler)
+                                processed_img = original_image.convert('L')
+                                
+                                # B. Kontrastı Güçlendir (Yazıyı koyu, kağıdı beyaz yapar)
+                                enhancer = ImageEnhance.Contrast(processed_img)
+                                processed_img = enhancer.enhance(2.0) # 2 kat kontrast
+                                
+                                # C. Keskinleştir (Harf kenarlarını belirginleştirir)
+                                processed_img = processed_img.filter(ImageFilter.SHARPEN)
+                                
+                                # --- OCR AYARLARI (OKUMA MODU) ---
+                                # --psm 3: Tam sayfa otomatik segmentasyon (Sayfanın tamamını okuması için şart)
+                                # --oem 3: Varsayılan motor modu
+                                custom_config = r'--oem 3 --psm 3'
+                                
+                                # Okuma İşlemi
+                                text = pytesseract.image_to_string(processed_img, lang='tur', config=custom_config)
+                                
+                                # Eğer sonuç boşsa bir de İngilizce kütüphanesini destek alarak dene
+                                if len(text) < 5:
+                                    text = pytesseract.image_to_string(processed_img, lang='tur+eng', config=custom_config)
                             
-                            ham_girdi = text
-                            st.success("Okuma Başarılı!")
-                            st.text_area("Okunan Metin:", value=ham_girdi, height=200)
+                            st.success("İşlem Tamamlandı!")
+                            st.text_area("Okunan Metin:", value=text, height=300)
+                            
                         except Exception as e:
                             st.error(f"Okuma Hatası: {e}")
                     else:
-                        st.error("OCR modülü (Tesseract) bulunamadı.")
+                        st.error("OCR motoru bulunamadı.")
     st.markdown("---")
     # FORMATLAMA BÖLÜMÜ
     c1, c2 = st.columns([1,2])
