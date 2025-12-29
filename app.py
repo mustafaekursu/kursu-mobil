@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image
 import os
 import datetime
-from dateutil.relativedelta import relativedelta # Tarih hesaplamaları için
+from dateutil.relativedelta import relativedelta
 
 # =============================================================================
 # 🟡 MODERN YAPAY ZEKA KÜTÜPHANELERİ (HATA YÖNETİMİ)
