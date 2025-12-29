@@ -6,3 +6,5 @@ easyocr
 opencv-python-headless
 Pillow
 openai-whisper
+python-dateutil
+protobuf==3.20.0
