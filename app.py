@@ -10,7 +10,7 @@ HAKIM_MAIL = "mustafa.emin.tr@hotmail.com"
 st.set_page_config(page_title="Kürsü Pro", page_icon="⚖️", layout="centered")
 
 st.title("⚖️ Kürsü Pro v14")
-st.caption("UygHesaplama Asistanı")
+st.caption("Hesaplama Asistanı")
 
 # --- SEKME YÖNETİMİ ---
 # 3 Ana Sekme Tanımlıyoruz
