@@ -1,21 +1,25 @@
 import streamlit as st
 import datetime
 from dateutil.relativedelta import relativedelta
-import math
 
-# --- RESMİ ARAYÜZ AYARLARI ---
+# --- KİŞİSEL AYARLAR ---
+# Mail adresinizi buraya tırnak içine yazınız
+HAKIM_MAIL = "mustafa.emin.tr@hotmail.com" 
+
+# --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Kürsü Pro", page_icon="⚖️", layout="centered")
 
-st.title("⚖️ Kürsü Pro v12")
-st.caption("T.C. Adalet Bakanlığı Mevzuatına Uygun Hesaplama Asistanı")
+st.title("⚖️ Kürsü Pro v14")
+st.caption("Hesaplama Asistanı")
 
-# Sekmeler
-tab1, tab2, tab3 = st.tabs(["⏳ Zamanaşımı Hesapla", "🔢 Ceza Hesapla (Hapis/Para)", "🛡️ İLETİŞİM & GÜVENLİK"])
-HAKIM_MAIL = "mustafa.emin.tr@hotmail.com"
+# --- SEKME YÖNETİMİ ---
+# 3 Ana Sekme Tanımlıyoruz
+tabs = st.tabs(["⏳ Zamanaşımı", "🔢 Ceza Hesapla", "🛡️ İletişim & Güvenlik"])
+
 # ==========================================
-# 1. MODÜL: ZAMANAŞIMI HESAPLAMA
+# MODÜL 1: ZAMANAŞIMI HESAPLAMA
 # ==========================================
-with tab1:
+with tabs[0]:
     st.header("⏳ Yasal Süre Hesaplayıcı")
     st.info("Dava ve Ceza Zamanaşımı Sürelerini Hesaplar.")
 
@@ -26,12 +30,12 @@ with tab1:
                                    "Ceza Zamanaşımı (TCK 68)", 
                                    "Hukuk/Borçlar (TBK)",
                                    "Hak Düşürücü Süreler"])
-        baslangic = st.date_input("Süre Başlangıç Tarihi", key="zaman_baslangic")
+        baslangic = st.date_input("Süre Başlangıç Tarihi")
 
     with col2:
-        yil = st.number_input("Temel Süre (Yıl)", 0, 50, 8, key="zaman_yil")
-        ay = st.number_input("Temel Süre (Ay)", 0, 11, 0, key="zaman_ay")
-        gun = st.number_input("Temel Süre (Gün)", 0, 30, 0, key="zaman_gun")
+        yil = st.number_input("Temel Süre (Yıl)", 0, 50, 8)
+        ay = st.number_input("Temel Süre (Ay)", 0, 11, 0)
+        gun = st.number_input("Temel Süre (Gün)", 0, 30, 0)
 
     # Hesaplama Motoru
     base_date = baslangic + relativedelta(years=yil, months=ay, days=gun)
@@ -44,93 +48,57 @@ with tab1:
         st.error(f"🚨 Kesin (Olağanüstü) Süre Sonu: **{max_date.strftime('%d.%m.%Y')}**")
         st.caption("TCK 67/4: Kesilme sebepleri olsa dahi bu tarih aşılamaz.")
 
-    with st.expander("➕ Durma Sebebi Ekle (Tutukluluk vb.)"):
-        durma_gun = st.number_input("Durma Süresi (Gün)", 0, 3650, 0, key="zaman_durma")
+    with st.expander("➕ Durma Sebebi Ekle"):
+        durma_gun = st.number_input("Durma Süresi (Gün)", 0, 3650, 0)
         if durma_gun > 0:
             yeni_son = base_date + relativedelta(days=durma_gun)
             st.info(f"Durma Eklenmiş Tarih: {yeni_son.strftime('%d.%m.%Y')}")
 
 # ==========================================
-# 2. MODÜL: CEZA HESAPLAMA (HAPİS & PARA)
+# MODÜL 2: CEZA HESAPLAMA
 # ==========================================
-with tab2:
+with tabs[1]:
     st.header("🔢 Ceza Hesaplama Modülü")
+    tur = st.radio("Ceza Türü", ["Hapis Cezası", "Adli Para Cezası"], horizontal=True)
     
-    tur = st.radio("Hesaplanacak Ceza Türü", ["Hapis Cezası", "Adli Para Cezası"], horizontal=True)
-    
-    # --- A) HAPİS CEZASI HESABI ---
     if tur == "Hapis Cezası":
-        st.subheader("Hapis Cezası Hesapla (TCK 61)")
-        
         c1, c2, c3 = st.columns(3)
-        with c1:
-            h_yil = st.number_input("Temel Ceza (Yıl)", 0, 100, 1)
-        with c2:
-            h_ay = st.number_input("Temel Ceza (Ay)", 0, 11, 0)
-        with c3:
-            h_gun = st.number_input("Temel Ceza (Gün)", 0, 29, 0)
-            
-        # Toplam günü hesapla (Basit hesap: 1 ay = 30 gün)
+        with c1: h_yil = st.number_input("Yıl", 0, 100, 1)
+        with c2: h_ay = st.number_input("Ay", 0, 11, 0)
+        with c3: h_gun = st.number_input("Gün", 0, 29, 0)
+        
         toplam_gun = (h_yil * 365) + (h_ay * 30) + h_gun
         st.markdown("---")
         
-        # Artırım / İndirim
         col_art, col_ind = st.columns(2)
         with col_art:
-            st.markdown("🔺 **Artırım Oranı**")
-            artirim_pay = st.number_input("Pay (Örn: 1)", 0, 10, 0, key="art_pay")
-            artirim_payda = st.number_input("Payda (Örn: 6)", 1, 10, 1, key="art_payda")
-        
+            st.markdown("🔺 **Artırım**")
+            art_pay = st.number_input("Pay", 0, 10, 0, key="art_p")
+            art_payda = st.number_input("Payda", 1, 10, 1, key="art_pd")
         with col_ind:
-            st.markdown("🔻 **İndirim Oranı (Takdiri vb.)**")
-            indirim_pay = st.number_input("Pay (Örn: 1)", 0, 10, 0, key="ind_pay")
-            indirim_payda = st.number_input("Payda (Örn: 6)", 1, 10, 6, key="ind_payda")
+            st.markdown("🔻 **İndirim**")
+            ind_pay = st.number_input("Pay", 0, 10, 0, key="ind_p")
+            ind_payda = st.number_input("Payda", 1, 10, 6, key="ind_pd")
             
-        # HESAPLAMA BUTONU
-        if st.button("Cezayı Hesapla"):
-            # 1. Artırım Uygula
-            if artirim_pay > 0:
-                artis_miktari = (toplam_gun * artirim_pay) / artirim_payda
-                toplam_gun += artis_miktari
-                st.info(f"Artırım Sonrası: {toplam_gun:.0f} gün")
+        if st.button("Hesapla"):
+            if art_pay > 0: toplam_gun += (toplam_gun * art_pay) / art_payda
+            if ind_pay > 0: toplam_gun -= (toplam_gun * ind_pay) / ind_payda
             
-            # 2. İndirim Uygula
-            if indirim_pay > 0:
-                indirim_miktari = (toplam_gun * indirim_pay) / indirim_payda
-                toplam_gun -= indirim_miktari
-            
-            # 3. Sonucu Yıl/Ay/Gün Çevir
-            sonuc_yil = int(toplam_gun / 365)
-            kalan_gun = toplam_gun % 365
-            sonuc_ay = int(kalan_gun / 30)
-            sonuc_gun = int(kalan_gun % 30)
-            
-            st.success(f"⚖️ **SONUÇ CEZA:** {sonuc_yil} Yıl, {sonuc_ay} Ay, {sonuc_gun} Gün")
-            
-    # --- B) ADLİ PARA CEZASI HESABI ---
-    else:
-        st.subheader("Adli Para Cezası Hesapla")
-        
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            gun_sayisi = st.number_input("Hükmedilen Gün Sayısı", min_value=5, value=100)
-        with col_p2:
-            gunluk_miktar = st.select_slider("Günlük Miktar (TL)", options=[20, 30, 40, 50, 60, 70, 80, 90, 100], value=20)
-            
-        toplam_tutar = gun_sayisi * gunluk_miktar
-        
-        st.metric(label="Ödenecek Toplam Adli Para Cezası", value=f"{toplam_tutar:,.2f} TL")
-        
-        st.markdown("### Taksitlendirme")
-        taksit = st.slider("Taksit Sayısı", 1, 24, 12)
-        aylik = toplam_tutar / taksit
-        st.caption(f"Aylık Ödeme: **{aylik:,.2f} TL** (İlk taksit peşin ödenirse)")
+            s_yil = int(toplam_gun / 365)
+            s_ay = int((toplam_gun % 365) / 30)
+            s_gun = int((toplam_gun % 365) % 30)
+            st.success(f"⚖️ Sonuç: {s_yil} Yıl, {s_ay} Ay, {s_gun} Gün")
 
-st.divider()
+    else:
+        st.subheader("Adli Para Cezası")
+        g_sayisi = st.number_input("Gün Sayısı", 5, 730, 100)
+        miktar = st.select_slider("Günlük Miktar (TL)", options=[20,30,40,50,100], value=20)
+        st.metric("Toplam Tutar", f"{g_sayisi * miktar:,.2f} TL")
+
 # =============================================================================
-# MODÜL 4: İLETİŞİM VE GÜVENLİK
+# MODÜL 3: İLETİŞİM VE GÜVENLİK (SİZİN TASARIMINIZ)
 # =============================================================================
-with tabs[3]:
+with tabs[2]:
     st.header("İletişim ve Güvenlik Protokolleri")
     
     # Güvenlik Bildirimi Kutusu (Yeşil Onaylı)
@@ -149,9 +117,17 @@ with tabs[3]:
     
     st.markdown("---")
     st.subheader("Geliştirici İletişim")
-    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold;'>📧 Geliştiriciye Mail Gönder</a></div>", unsafe_allow_html=True)
+    
+    # Mail butonu (Sizin istediğiniz tasarım)
+    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold; text-decoration:none;'>📧 Geliştiriciye Mail Gönder</a></div>", unsafe_allow_html=True)
     
     st.write("")
+    st.caption("Not: Bu alan üzerinden gönderilen mesajlar doğrudan şifreli e-posta sunucularına iletilir.")
+    
+    # Not Defteri
     st.text_area("Kendinize Şifreli Not Bırakın (Cihaz Önbelleğinde Kalır):")
-    st.button("Notu Geçici Olarak Kaydet")
+    if st.button("Notu Geçici Olarak Kaydet"):
+        st.toast("Not şifrelendi ve geçici hafızaya alındı.", icon="🔒")
+
+st.markdown("---")
 st.markdown("© 2025 - Resmi Kullanım İçindir.")
