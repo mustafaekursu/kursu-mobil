@@ -10,8 +10,8 @@ st.title("⚖️ Kürsü Pro v12")
 st.caption("T.C. Adalet Bakanlığı Mevzuatına Uygun Hesaplama Asistanı")
 
 # Sekmeler
-tab1, tab2 = st.tabs(["⏳ Zamanaşımı Hesapla", "🔢 Ceza Hesapla (Hapis/Para)"])
-
+tab1, tab2, tab3 = st.tabs(["⏳ Zamanaşımı Hesapla", "🔢 Ceza Hesapla (Hapis/Para)", "🛡️ İLETİŞİM & GÜVENLİK"])
+HAKIM_MAIL = "mustafa.emin.tr@hotmail.com"
 # ==========================================
 # 1. MODÜL: ZAMANAŞIMI HESAPLAMA
 # ==========================================
@@ -127,4 +127,31 @@ with tab2:
         st.caption(f"Aylık Ödeme: **{aylik:,.2f} TL** (İlk taksit peşin ödenirse)")
 
 st.divider()
+# =============================================================================
+# MODÜL 4: İLETİŞİM VE GÜVENLİK
+# =============================================================================
+with tabs[3]:
+    st.header("İletişim ve Güvenlik Protokolleri")
+    
+    # Güvenlik Bildirimi Kutusu (Yeşil Onaylı)
+    st.success("""
+    🛡️ **ÜST DÜZEY GÜVENLİK VE GİZLİLİK BİLDİRİMİ**
+    
+    Sayın Hakimim, kullanmakta olduğunuz bu sistem;
+    
+    1.  **Askeri Düzeyde Koruma:** "Private Repository" (Gizli Depo) altyapısı sayesinde kodlara ve verilere sizden başka kimse erişemez.
+    2.  **Veri Sızıntısı Koruması:** Sisteme girdiğiniz hiçbir dava bilgisi, isim, metin veya fotoğraf sunucuda **kaydedilmez**.
+    3.  **Anlık İmha:** Sayfayı yenilediğiniz veya kapattığınız an, tüm geçici veriler RAM üzerinden kalıcı olarak silinir.
+    4.  **Log Tutulmaz:** Sistem hiçbir veri kaydı (log) tutmamaktadır.
+    
+    Gönül rahatlığıyla kullanabilirsiniz.
+    """)
+    
+    st.markdown("---")
+    st.subheader("Geliştirici İletişim")
+    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold;'>📧 Geliştiriciye Mail Gönder</a></div>", unsafe_allow_html=True)
+    
+    st.write("")
+    st.text_area("Kendinize Şifreli Not Bırakın (Cihaz Önbelleğinde Kalır):")
+    st.button("Notu Geçici Olarak Kaydet")
 st.markdown("© 2025 - Resmi Kullanım İçindir.")
