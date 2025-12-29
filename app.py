@@ -6,21 +6,6 @@ import datetime
 from dateutil.relativedelta import relativedelta
 
 # =============================================================================
-# 🟡 MODERN YAPAY ZEKA KÜTÜPHANELERİ (HATA YÖNETİMİ)
-# =============================================================================
-try:
-    import easyocr
-    OCR_AVAILABLE = True
-except ImportError:
-    OCR_AVAILABLE = False
-
-try:
-    import whisper
-    WHISPER_AVAILABLE = True
-except ImportError:
-    WHISPER_AVAILABLE = False
-
-# =============================================================================
 # 🟢 AYARLAR & GÖRÜNÜM
 # =============================================================================
 HAKIM_MAIL = "mustafa.emin.tr@hotmail.com" # Mailinizi buraya yazabilirsiniz
