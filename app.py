@@ -2,15 +2,15 @@ import streamlit as st
 import datetime
 from dateutil.relativedelta import relativedelta
 
-# --- KİŞİSEL AYARLAR ---
-# Mail adresinizi buraya tırnak içine yazınız
+# --- KİŞİSEL AYARLAR (BURAYI DEĞİŞTİRİN) ---
+# Lütfen aşağıdaki tırnak işaretlerinin içine kendi mail adresinizi yazın.
 HAKIM_MAIL = "mustafa.emin.tr@hotmail.com" 
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Kürsü Pro", page_icon="⚖️", layout="centered")
 
 st.title("⚖️ Kürsü Pro v14")
-st.caption("Hesaplama Asistanı")
+st.caption("UygHesaplama Asistanı")
 
 # --- SEKME YÖNETİMİ ---
 # 3 Ana Sekme Tanımlıyoruz
@@ -118,7 +118,7 @@ with tabs[2]:
     st.markdown("---")
     st.subheader("Geliştirici İletişim")
     
-    # Mail butonu (Sizin istediğiniz tasarım)
+    # Mail butonu
     st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold; text-decoration:none;'>📧 Geliştiriciye Mail Gönder</a></div>", unsafe_allow_html=True)
     
     st.write("")
