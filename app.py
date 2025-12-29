@@ -119,7 +119,7 @@ with tabs[2]:
     st.subheader("Geliştirici İletişim")
     
     # Mail butonu
-    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold; text-decoration:none;'>📧 Geliştiriciye Mail Gönder</a></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='border:1px dashed #333; padding:15px; text-align:center;'><a href='mailto:{HAKIM_MAIL}' style='font-size:1.2em; color:#c0392b; font-weight:bold; text-decoration:none;'>📧 mustafa.emin.tr@hotmail.com</a></div>", unsafe_allow_html=True)
     
     st.write("")
     st.caption("Not: Bu alan üzerinden gönderilen mesajlar doğrudan şifreli e-posta sunucularına iletilir.")
