@@ -1,8 +1,5 @@
 streamlit
-easyocr
-openai-whisper
-numpy
-Pillow
 pandas
-openpyxl
+numpy
 requests
+Pillow
