@@ -2,6 +2,8 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import os
+import datetime
+from dateutil.relativedelta import relativedelta # Tarih hesaplamaları için
 
 # =============================================================================
 # 🟡 MODERN YAPAY ZEKA KÜTÜPHANELERİ (HATA YÖNETİMİ)
@@ -161,6 +163,59 @@ with tabs[2]:
     
     y,r = divmod(total, 360); m,d = divmod(r, 30)
     st.markdown(f"<div class='sonuc-panel'><h3>{int(y)} Yıl, {int(m)} Ay, {int(d)} Gün</h3>Adli Para: {int(total_p)} Gün</div>", unsafe_allow_html=True)
+    # --- ZAMANAŞIMI HESAPLAMA MODÜLÜ ---
+st.markdown("---")
+st.header("⚖️ Hukuki Süre Hesaplama Uzmanı")
+
+hesap_tipi = st.radio("Hesaplama Türü Seçiniz:", ["Ceza Zamanaşımı (TCK)", "Hukuk/Dava Zamanaşımı (TBK/HMK)"], horizontal=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    baslangic_tarihi = st.date_input("Süre Başlangıç Tarihi (Suç/Olay Tarihi)")
+with col2:
+    temel_sure_yil = st.number_input("Temel Zamanaşımı Süresi (Yıl)", min_value=1, value=8)
+
+# Hesaplama Değişkenleri
+bitis_tarihi = baslangic_tarihi + relativedelta(years=temel_sure_yil)
+maksimum_sure_tarihi = baslangic_tarihi + relativedelta(years=int(temel_sure_yil * 1.5)) # TCK Olağanüstü zamanaşımı
+
+# 1. DURMA SEBEPLERİ (Süreyi Uzatır)
+with st.expander("⏳ Durma Sebepleri Ekle (Süre İşlemez)"):
+    st.info("Örn: Bekletici mesele, İzin alma süreci vb.")
+    durma_gun = st.number_input("Toplam Durma Süresi (Gün)", min_value=0, value=0)
+    durma_ay = st.number_input("Toplam Durma Süresi (Ay)", min_value=0, value=0)
+    
+    # Durma süresini bitişe ekle
+    uzatma = relativedelta(months=durma_ay, days=durma_gun)
+    bitis_tarihi += uzatma
+    maksimum_sure_tarihi += uzatma # Durma, olağanüstü süreyi de öteler
+
+# 2. KESME SEBEPLERİ (Süreyi Sıfırlar)
+with st.expander("✂️ Kesme Sebepleri Ekle (Süre Sıfırlanır)"):
+    st.info("Örn: İfade alma, İddianame düzenlenmesi, Mahkumiyet kararı vb.")
+    kesme_var_mi = st.checkbox("Zamanaşımını Kesen Bir İşlem Yapıldı mı?")
+    
+    if kesme_var_mi:
+        son_kesme_tarihi = st.date_input("En Son Yapılan Kesici İşlem Tarihi")
+        # Kural: Süre kesilince, o tarihten itibaren temel süre kadar yeniden başlar
+        if son_kesme_tarihi > baslangic_tarihi:
+            yeni_bitis = son_kesme_tarihi + relativedelta(years=temel_sure_yil) + uzatma
+            # Ceza hukukunda kesilme olsa bile toplam süre (1.5 katı) aşılamaz
+            if hesap_tipi == "Ceza Zamanaşımı (TCK)":
+                if yeni_bitis > maksimum_sure_tarihi:
+                    st.warning(f"⚠️ DİKKAT: Kesilme olsa bile TCK 67/4 gereği olağanüstü zamanaşımı ({maksimum_sure_tarihi}) aşılamaz.")
+                    bitis_tarihi = maksimum_sure_tarihi
+                else:
+                    bitis_tarihi = yeni_bitis
+            else:
+                # Hukuk davalarında (TBK) genelde üst sınır (tavan) farklıdır, burada basit reset mantığı işler
+                bitis_tarihi = yeni_bitis
+
+# --- SONUÇ EKRANI ---
+st.success(f"🗓️ Tahmini Zamanaşımı Dolma Tarihi: **{bitis_tarihi.strftime('%d.%m.%Y')}**")
+
+if hesap_tipi == "Ceza Zamanaşımı (TCK)":
+    st.caption(f"ℹ️ TCK 66/67 kapsamında Olağanüstü (Maksimum) Süre Sınırı: {maksimum_sure_tarihi.strftime('%d.%m.%Y')}")
 
 # =============================================================================
 # MODÜL 4: İLETİŞİM VE GÜVENLİK
